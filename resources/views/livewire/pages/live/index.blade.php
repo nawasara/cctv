@@ -90,10 +90,13 @@
                                             </span>
                                         </span>
 
-                                        {{-- status online/offline --}}
+                                        {{-- status online/offline.
+                                             relative WAJIB di span luar — ping span pakai
+                                             absolute, tanpa relative parent ia ambil posisi
+                                             dari ancestor lain dan melayang saat scroll. --}}
                                         @if ($camera->isOnline())
-                                            <span class="flex size-2.5 shrink-0">
-                                                <span class="absolute inline-flex size-2.5 animate-ping rounded-full
+                                            <span class="relative flex size-2.5 shrink-0">
+                                                <span class="absolute inline-flex size-full animate-ping rounded-full
                                                              bg-green-400 opacity-60"></span>
                                                 <span class="relative inline-flex size-2.5 rounded-full bg-green-500"></span>
                                             </span>
