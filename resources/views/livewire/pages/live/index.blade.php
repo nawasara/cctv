@@ -22,79 +22,206 @@
         @if ($this->cameras->isEmpty())
             <x-nawasara-ui::empty-state icon="lucide-monitor-off" title="Belum ada kamera aktif"
                 description="Tambahkan kamera di menu Cameras, lalu pastikan statusnya aktif." />
-        @elseif ($focused)
-            {{-- Single-camera focus --}}
-            @php $cam = $this->cameras->firstWhere('slug', $focused); @endphp
-            @if ($cam)
-                <div class="mb-3">
-                    <x-nawasara-ui::button variant="ghost" color="secondary" size="sm" wire:click="unfocus">
-                        <x-slot:icon><x-lucide-arrow-left class="size-4" /></x-slot:icon>
-                        Kembali ke grid
-                    </x-nawasara-ui::button>
-                </div>
-                <div class="overflow-hidden rounded-lg border border-gray-200 bg-black dark:border-gray-800">
-                    {{-- aspect-video frame; iframe absolutely fills it so go2rtc's
-                         player stretches edge-to-edge instead of sitting native-size
-                         in the middle with letterbox + scrollbars. --}}
-                    <div class="relative aspect-video w-full" wire:ignore>
-                        <iframe
-                            src="{{ $this->go2rtcPublicUrl }}/stream.html?src={{ urlencode($cam->slug) }}&mode={{ $this->defaultMode }}"
-                            class="absolute inset-0 h-full w-full border-0"
-                            scrolling="no" allow="autoplay; fullscreen"
-                            referrerpolicy="no-referrer"></iframe>
+        @else
+            {{--
+                Layout: sidebar daftar kamera (kiri) + grid video terpilih (kanan).
+                User kurasi sendiri kamera mana yang ditonton, maksimal 4.
+
+                Web component <video-stream> di-load dari go2rtc via dynamic
+                import() — BUKAN iframe stream.html — supaya:
+                  1. Tidak kena CORS dari <link rel=manifest> eksternal go2rtc.
+                  2. Layout dikontrol penuh (no iframe scrollbar / letterbox).
+                  3. Semua video satu DOM — sidebar + grid gampang.
+            --}}
+            <div x-data="cctvLive('{{ $this->go2rtcPublicUrl }}')"
+                class="flex flex-col gap-4 lg:flex-row">
+
+                {{-- ============ SIDEBAR — daftar kamera ============ --}}
+                <aside class="w-full shrink-0 lg:w-72">
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-800">
+                        <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3
+                                    dark:border-gray-800">
+                            <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                                Daftar CCTV
+                            </h2>
+                            <span class="text-xs text-gray-500">
+                                {{ count($selected) }}/{{ \Nawasara\Cctv\Livewire\Live\Index::MAX_SELECTED }}
+                            </span>
+                        </div>
+
+                        <ul class="max-h-[28rem] overflow-y-auto p-2">
+                            @foreach ($this->cameras as $camera)
+                                @php $isSelected = in_array($camera->slug, $selected, true); @endphp
+                                <li wire:key="cam-li-{{ $camera->id }}">
+                                    <button type="button"
+                                        wire:click="toggle('{{ $camera->slug }}')"
+                                        @class([
+                                            'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition',
+                                            'bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' => $isSelected,
+                                            'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-900' => ! $isSelected,
+                                        ])>
+                                        {{-- indikator terpilih --}}
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded border',
+                                            'border-emerald-600 bg-emerald-600 text-white' => $isSelected,
+                                            'border-gray-300 dark:border-gray-700' => ! $isSelected,
+                                        ])>
+                                            @if ($isSelected)
+                                                <x-lucide-check class="size-3" />
+                                            @endif
+                                        </span>
+
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate font-medium">{{ $camera->name }}</span>
+                                            <span class="block truncate text-xs text-gray-500">
+                                                {{ $camera->location ?: '—' }}
+                                            </span>
+                                        </span>
+
+                                        {{-- status online/offline --}}
+                                        @if ($camera->isOnline())
+                                            <span class="size-2 shrink-0 rounded-full bg-green-500"
+                                                title="online"></span>
+                                        @else
+                                            <span class="size-2 shrink-0 rounded-full bg-rose-500"
+                                                title="offline"></span>
+                                        @endif
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+
+                        @if (count($selected) > 0)
+                            <div class="border-t border-gray-200 p-2 dark:border-gray-800">
+                                <button type="button" wire:click="clearSelection"
+                                    class="w-full rounded-md px-3 py-1.5 text-xs text-gray-500
+                                           hover:bg-gray-50 hover:text-gray-700
+                                           dark:hover:bg-gray-900 dark:hover:text-gray-300">
+                                    Kosongkan pilihan
+                                </button>
+                            </div>
+                        @endif
                     </div>
-                </div>
-                <div class="mt-2 flex items-center justify-between">
-                    <div>
-                        <p class="font-medium text-gray-900 dark:text-gray-100">{{ $cam->name }}</p>
-                        <p class="text-sm text-gray-500">{{ $cam->location ?: '—' }}</p>
-                    </div>
-                    @if ($cam->isOnline())
-                        <x-nawasara-ui::badge color="success">online</x-nawasara-ui::badge>
+
+                    <p class="mt-2 px-1 text-xs text-gray-400">
+                        Klik kamera untuk menonton. Maksimal
+                        {{ \Nawasara\Cctv\Livewire\Live\Index::MAX_SELECTED }} kamera bersamaan.
+                    </p>
+                </aside>
+
+                {{-- ============ GRID VIDEO — kamera terpilih ============ --}}
+                <div class="min-w-0 flex-1">
+                    @if ($this->selectedCameras->isEmpty())
+                        <div class="flex h-64 items-center justify-center rounded-lg border border-dashed
+                                    border-gray-300 text-sm text-gray-400 dark:border-gray-700">
+                            Pilih kamera dari daftar untuk mulai menonton.
+                        </div>
                     @else
-                        <x-nawasara-ui::badge color="danger">offline</x-nawasara-ui::badge>
+                        {{-- 1 kamera = full width; 2+ = grid 2 kolom (maks 2x2) --}}
+                        <div @class([
+                            'grid gap-3',
+                            'grid-cols-1' => $this->selectedCameras->count() === 1,
+                            'grid-cols-1 sm:grid-cols-2' => $this->selectedCameras->count() > 1,
+                        ])>
+                            @foreach ($this->selectedCameras as $camera)
+                                <div wire:key="live-{{ $camera->id }}"
+                                    class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+                                    {{-- video-stream web component di-mount oleh Alpine.
+                                         wire:ignore — jangan biarkan Livewire patch ulang
+                                         DOM video (akan putus koneksi WebRTC tiap render). --}}
+                                    <div class="relative aspect-video w-full bg-black"
+                                        wire:ignore
+                                        x-data="{ slug: '{{ $camera->slug }}' }"
+                                        x-init="mountStream($el, slug)">
+                                        {{-- <video-stream> disuntik di sini oleh mountStream() --}}
+                                    </div>
+                                    <div class="flex items-center justify-between px-3 py-2">
+                                        <div class="min-w-0">
+                                            <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                {{ $camera->name }}
+                                            </p>
+                                            <p class="truncate text-xs text-gray-500">
+                                                {{ $camera->location ?: '—' }}
+                                            </p>
+                                        </div>
+                                        <button type="button" wire:click="toggle('{{ $camera->slug }}')"
+                                            class="shrink-0 rounded-md p-1.5 text-gray-400 transition
+                                                   hover:bg-rose-50 hover:text-rose-600
+                                                   dark:hover:bg-rose-950"
+                                            title="Tutup kamera ini">
+                                            <x-lucide-x class="size-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
                 </div>
-            @endif
-        @else
-            {{-- Grid mode — semua kamera --}}
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                @foreach ($this->cameras as $camera)
-                    <div wire:key="live-{{ $camera->id }}"
-                        class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
-                        {{-- relative + absolute-fill iframe: go2rtc player stretches
-                             to fill the 16:9 cell, no letterbox / scrollbar. --}}
-                        <div class="relative aspect-video w-full bg-black" wire:ignore>
-                            <iframe
-                                src="{{ $this->go2rtcPublicUrl }}/stream.html?src={{ urlencode($camera->slug) }}&mode={{ $this->defaultMode }}"
-                                class="absolute inset-0 h-full w-full border-0"
-                                scrolling="no" loading="lazy" allow="autoplay"
-                                referrerpolicy="no-referrer"></iframe>
-                        </div>
-                        <div class="flex items-center justify-between px-3 py-2">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {{ $camera->name }}
-                                </p>
-                                <p class="truncate text-xs text-gray-500">{{ $camera->location ?: '—' }}</p>
-                            </div>
-                            <div class="flex shrink-0 items-center gap-2">
-                                @if ($camera->isOnline())
-                                    <span class="inline-block size-2 rounded-full bg-green-500"
-                                        title="online"></span>
-                                @else
-                                    <span class="inline-block size-2 rounded-full bg-rose-500"
-                                        title="offline"></span>
-                                @endif
-                                <x-nawasara-ui::button variant="ghost" color="secondary" size="sm"
-                                    wire:click="focus('{{ $camera->slug }}')">
-                                    <x-slot:icon><x-lucide-maximize-2 class="size-4" /></x-slot:icon>
-                                </x-nawasara-ui::button>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
             </div>
+
+            {{--
+                cctvLive() — Alpine component. mountStream() dynamic-import
+                video-rtc.js + video-stream.js dari go2rtc, lalu buat elemen
+                <video-stream> dan arahkan ke WebSocket signaling go2rtc.
+                Dynamic import dibungkus once-guard supaya tidak re-fetch
+                modul tiap kamera.
+            --}}
+            @script
+            <script>
+                Alpine.data('cctvLive', (go2rtcBase) => ({
+                    // base URL go2rtc untuk browser; pastikan tanpa trailing slash
+                    base: go2rtcBase.replace(/\/$/, ''),
+
+                    // Promise modul go2rtc — di-load sekali, di-share semua stream.
+                    _modulePromise: null,
+
+                    loadModule() {
+                        if (!this._modulePromise) {
+                            // video-stream.js sendiri yang import video-rtc.js
+                            // (relatif). Sekali load, custom element <video-stream>
+                            // ter-register global.
+                            this._modulePromise = import(`${this.base}/video-stream.js`)
+                                .catch(err => {
+                                    console.error('[cctv] gagal load go2rtc video-stream.js', err);
+                                    this._modulePromise = null; // boleh retry
+                                    throw err;
+                                });
+                        }
+                        return this._modulePromise;
+                    },
+
+                    async mountStream(container, slug) {
+                        try {
+                            await this.loadModule();
+                        } catch {
+                            container.innerHTML =
+                                '<div class="flex h-full w-full items-center justify-center ' +
+                                'text-xs text-rose-400">Gagal memuat player go2rtc</div>';
+                            return;
+                        }
+
+                        // Hindari double-mount kalau Alpine re-init elemen.
+                        if (container.querySelector('video-stream')) return;
+
+                        const el = document.createElement('video-stream');
+                        // background=true: tampilkan frame terakhir saat buffering.
+                        el.background = true;
+                        el.mode = '{{ $this->defaultMode }}';
+                        // WebSocket signaling endpoint go2rtc untuk stream ini.
+                        el.src = new URL(
+                            `api/ws?src=${encodeURIComponent(slug)}`,
+                            this.base + '/'
+                        );
+                        // isi penuh container aspect-video
+                        el.style.position = 'absolute';
+                        el.style.inset = '0';
+                        el.style.width = '100%';
+                        el.style.height = '100%';
+                        container.appendChild(el);
+                    },
+                }));
+            </script>
+            @endscript
         @endif
     </x-nawasara-ui::page.container>
 </div>
