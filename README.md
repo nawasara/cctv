@@ -36,21 +36,15 @@ berikutnya, halaman itu langsung berfungsi tanpa perubahan.
 
 ### 1. Sidecar go2rtc (docker-compose)
 
-Tambahkan service di `docker-compose.dev.yml`:
+Sudah ditambahkan di `docker-compose.dev.yml` sebagai service `go2rtc`
+(image `alexxit/go2rtc`), berada di network `nawasara-dev` yang sama
+dengan app. Container menjangkau kamera di LAN lewat routing Docker host —
+tidak perlu `network_mode` khusus selama host bisa me-route ke subnet
+kamera.
 
-```yaml
-  go2rtc:
-    image: alexxit/go2rtc:latest
-    restart: unless-stopped
-    network_mode: bridge   # butuh akses ke jaringan kamera
-    ports:
-      - "1984:1984"        # HTTP API + web UI
-      - "8555:8555/tcp"    # WebRTC TCP
-      - "8555:8555/udp"    # WebRTC UDP
-```
-
-Reverse-proxy `/go2rtc/` ke `go2rtc:1984` supaya browser bisa akses
-WebRTC player.
+Reverse-proxy `/go2rtc/` → `go2rtc:1984` sudah disiapkan di
+`docker/nginx.conf` (pakai `resolver` + variabel `proxy_pass` supaya nginx
+tidak gagal boot kalau sidecar belum up).
 
 ### 2. Environment
 
