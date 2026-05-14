@@ -109,6 +109,21 @@
                 </div>
             </div>
 
+            {{-- Koordinat — untuk plot kamera di peta. Opsional; kamera tanpa
+                 koordinat di-skip dari map view. --}}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <x-nawasara-ui::form.input label="Latitude" wire:model="latitude"
+                        placeholder="-7.8696" inputmode="decimal" />
+                    @error('latitude') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                </div>
+                <div>
+                    <x-nawasara-ui::form.input label="Longitude" wire:model="longitude"
+                        placeholder="111.4625" inputmode="decimal" />
+                    @error('longitude') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div class="sm:col-span-2">
                     <x-nawasara-ui::form.input label="Alamat IP" wire:model="ip_address"

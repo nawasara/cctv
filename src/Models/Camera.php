@@ -25,6 +25,8 @@ class Camera extends Model
         'name',
         'sync_title',
         'location',
+        'latitude',
+        'longitude',
         'slug',
         'ip_address',
         'rtsp_port',
@@ -50,6 +52,8 @@ class Camera extends Model
         'recording_enabled' => 'boolean',
         'channel' => 'integer',
         'subtype' => 'integer',
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
         'rtsp_port' => 'integer',
         'http_port' => 'integer',
         'failure_count' => 'integer',
@@ -73,6 +77,8 @@ class Camera extends Model
                 'name',
                 'sync_title',
                 'location',
+                'latitude',
+                'longitude',
                 'slug',
                 'ip_address',
                 'rtsp_port',
@@ -159,5 +165,14 @@ class Camera extends Model
     public function isOnline(): bool
     {
         return $this->health_status === 'online';
+    }
+
+    /**
+     * Punya koordinat lengkap? Dipakai untuk filter kamera yang bisa
+     * di-plot di peta — yang null di-skip dari map view.
+     */
+    public function hasCoordinates(): bool
+    {
+        return $this->latitude !== null && $this->longitude !== null;
     }
 }

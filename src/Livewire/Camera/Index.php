@@ -33,6 +33,8 @@ class Index extends Component
     public string $name = '';
     public bool $sync_title = true;
     public string $location = '';
+    public string $latitude = '';
+    public string $longitude = '';
     public string $ip_address = '';
     public int $rtsp_port = 554;
     public int $http_port = 80;
@@ -50,6 +52,8 @@ class Index extends Component
             'name' => ['required', 'string', 'max:255'],
             'sync_title' => ['boolean'],
             'location' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'ip_address' => ['required', 'ip'],
             'rtsp_port' => ['required', 'integer', 'min:1', 'max:65535'],
             'http_port' => ['required', 'integer', 'min:1', 'max:65535'],
@@ -101,6 +105,8 @@ class Index extends Component
         $this->name = $camera->name;
         $this->sync_title = $camera->sync_title;
         $this->location = (string) $camera->location;
+        $this->latitude = (string) ($camera->latitude ?? '');
+        $this->longitude = (string) ($camera->longitude ?? '');
         $this->ip_address = $camera->ip_address;
         $this->rtsp_port = $camera->rtsp_port;
         $this->http_port = $camera->http_port;
@@ -127,6 +133,8 @@ class Index extends Component
                 'name' => $validated['name'],
                 'sync_title' => $validated['sync_title'],
                 'location' => $validated['location'] ?: null,
+                'latitude' => $validated['latitude'] !== '' ? $validated['latitude'] : null,
+                'longitude' => $validated['longitude'] !== '' ? $validated['longitude'] : null,
                 'ip_address' => $validated['ip_address'],
                 'rtsp_port' => $validated['rtsp_port'],
                 'http_port' => $validated['http_port'],
@@ -147,6 +155,8 @@ class Index extends Component
                 'name' => $validated['name'],
                 'sync_title' => $validated['sync_title'],
                 'location' => $validated['location'] ?: null,
+                'latitude' => $validated['latitude'] !== '' ? $validated['latitude'] : null,
+                'longitude' => $validated['longitude'] !== '' ? $validated['longitude'] : null,
                 'slug' => $this->uniqueSlug($validated['name']),
                 'ip_address' => $validated['ip_address'],
                 'rtsp_port' => $validated['rtsp_port'],
@@ -194,8 +204,8 @@ class Index extends Component
     private function resetForm(): void
     {
         $this->reset([
-            'editingId', 'name', 'location', 'ip_address',
-            'username', 'password',
+            'editingId', 'name', 'location', 'latitude', 'longitude',
+            'ip_address', 'username', 'password',
         ]);
         $this->rtsp_port = 554;
         $this->http_port = 80;
