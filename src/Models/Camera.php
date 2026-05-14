@@ -30,6 +30,7 @@ class Camera extends Model
         'http_port',
         'channel',
         'subtype',
+        'video_codec',
         'username',
         'password',
         'is_active',
@@ -75,6 +76,7 @@ class Camera extends Model
                 'http_port',
                 'channel',
                 'subtype',
+                'video_codec',
                 'is_active',
                 'recording_enabled',
             ])
@@ -118,6 +120,37 @@ class Camera extends Model
             $this->rtsp_port,
             $path,
         );
+    }
+
+    /**
+     * Bangun string `src` yang dikirim ke go2rtc (PUT /api/streams).
+     *
+     * Ini BUKAN sekadar URL RTSP — go2rtc menerima "source string" yang bisa
+     * berupa RTSP mentah ATAU dibungkus prefix `ffmpeg:` untuk transcode.
+     *
+     * Kenapa perlu dibungkus: browser tidak bisa memutar H.265/HEVC lewat
+     * WebRTC. Kamera Dahua yang streaming H.265 harus di-transcode ke H.264
+     * dulu, kalau tidak video stuck 0:00 di browser.
+     *
+     *   video_codec = 'auto' | 'h264'  -> RTSP passthrough (no transcode)
+     *   video_codec = 'h265'           -> ffmpeg: wrapper, transcode ke H.264
+     *
+     * @param  int|null  $subtype  override subtype, diteruskan ke buildRtspUrl()
+     */
+    public function buildGo2rtcSource(?int $subtype = null): string
+    {
+        $rtsp = $this->buildRtspUrl($subtype);
+
+        // H.265 -> bungkus dengan ffmpeg transcode. #video=h264 minta go2rtc
+        // transcode video ke H.264; #rtsp_transport=tcp lebih tahan terhadap
+        // jaringan flaky daripada UDP default ffmpeg.
+        if ($this->video_codec === 'h265') {
+            return 'ffmpeg:'.$rtsp.'#video=h264#rtsp_transport=tcp';
+        }
+
+        // 'auto' / 'h264' -> passthrough. go2rtc connect RTSP langsung,
+        // browser putar H.264 native tanpa beban CPU transcode.
+        return $rtsp;
     }
 
     public function isOnline(): bool

@@ -138,6 +138,17 @@
                 </div>
             </div>
 
+            <div>
+                <x-nawasara-ui::form.select label="Codec Video" wire:model="video_codec"
+                    :options="[
+                        'auto' => 'Auto / H.264 (tanpa transcode)',
+                        'h264' => 'H.264 (eksplisit)',
+                        'h265' => 'H.265 / HEVC (transcode ke H.264)',
+                    ]" :placeholder="null"
+                    hint="Kamera Dahua sering H.265 — browser tidak bisa putar H.265 via WebRTC. Pilih H.265 supaya go2rtc transcode (lebih berat CPU)." />
+                @error('video_codec') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+            </div>
+
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <x-nawasara-ui::form.input label="Username Kamera" wire:model="username"

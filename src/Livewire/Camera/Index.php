@@ -37,6 +37,7 @@ class Index extends Component
     public int $http_port = 80;
     public int $channel = 1;
     public int $subtype = 0;
+    public string $video_codec = 'auto';
     public string $username = '';
     public string $password = '';
     public bool $is_active = true;
@@ -52,6 +53,7 @@ class Index extends Component
             'http_port' => ['required', 'integer', 'min:1', 'max:65535'],
             'channel' => ['required', 'integer', 'min:1', 'max:16'],
             'subtype' => ['required', 'integer', 'in:0,1'],
+            'video_codec' => ['required', 'string', 'in:auto,h264,h265'],
             'username' => ['required', 'string', 'max:255'],
             // Password wajib saat create; saat edit boleh kosong (= tidak diubah).
             'password' => [$this->editingId ? 'nullable' : 'required', 'string', 'max:255'],
@@ -101,6 +103,7 @@ class Index extends Component
         $this->http_port = $camera->http_port;
         $this->channel = $camera->channel;
         $this->subtype = $camera->subtype;
+        $this->video_codec = $camera->video_codec;
         $this->username = $camera->username;
         $this->password = ''; // jangan echo password balik — kosongkan
         $this->is_active = $camera->is_active;
@@ -125,6 +128,7 @@ class Index extends Component
                 'http_port' => $validated['http_port'],
                 'channel' => $validated['channel'],
                 'subtype' => $validated['subtype'],
+                'video_codec' => $validated['video_codec'],
                 'username' => $validated['username'],
                 'is_active' => $validated['is_active'],
                 'recording_enabled' => $validated['recording_enabled'],
@@ -144,6 +148,7 @@ class Index extends Component
                 'http_port' => $validated['http_port'],
                 'channel' => $validated['channel'],
                 'subtype' => $validated['subtype'],
+                'video_codec' => $validated['video_codec'],
                 'username' => $validated['username'],
                 'password' => $validated['password'],
                 'is_active' => $validated['is_active'],
@@ -191,6 +196,7 @@ class Index extends Component
         $this->http_port = 80;
         $this->channel = 1;
         $this->subtype = 0;
+        $this->video_codec = 'auto';
         $this->is_active = true;
         $this->recording_enabled = false;
         $this->resetValidation();

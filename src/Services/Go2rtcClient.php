@@ -48,10 +48,19 @@ class Go2rtcClient
     public function registerCamera(Camera $camera): bool
     {
         try {
-            $response = $this->http()->put('/api/streams', [
-                'name' => $camera->slug,
-                'src' => $camera->buildRtspUrl(),
-            ]);
+            // go2rtc /api/streams membaca parameter dari QUERY STRING, bukan
+            // request body. `Http::put($url, [...])` default kirim JSON body
+            // yang go2rtc abaikan diam-diam (balas 200 tapi stream tidak
+            // terdaftar). Karena itu params dikirim via ->withQueryParameters().
+            //
+            // src = buildGo2rtcSource() (bukan buildRtspUrl) — kamera H.265
+            // perlu dibungkus prefix ffmpeg: untuk transcode ke H.264.
+            $response = $this->http()
+                ->withQueryParameters([
+                    'name' => $camera->slug,
+                    'src' => $camera->buildGo2rtcSource(),
+                ])
+                ->put('/api/streams');
 
             if ($response->failed()) {
                 Log::warning('go2rtc registerCamera failed', [
@@ -81,7 +90,11 @@ class Go2rtcClient
     public function removeCamera(string $slug): bool
     {
         try {
-            $response = $this->http()->delete('/api/streams', ['src' => $slug]);
+            // Sama seperti registerCamera: go2rtc baca param dari query string.
+            // DELETE /api/streams?src=<name> menghapus stream by name.
+            $response = $this->http()
+                ->withQueryParameters(['src' => $slug])
+                ->delete('/api/streams');
 
             return $response->successful();
         } catch (\Throwable $e) {
