@@ -1,19 +1,20 @@
 <div>
     <x-nawasara-ui::page.container>
-        <x-nawasara-ui::page.title>Cameras</x-nawasara-ui::page.title>
-
-        <x-slot name="actions">
+        {{-- Page header — judul + jumlah kamera + tombol Tambah --}}
+        <x-nawasara-ui::page-header
+            title="Camera"
+            description="Registry kamera CCTV Dahua. Stream didaftarkan ke go2rtc untuk live view."
+            :count="$this->cameras->total().' kamera'">
             <x-nawasara-ui::button color="primary" wire:click="openCreate" permission="cctv.camera.create">
                 <x-slot:icon><x-lucide-plus class="size-4" /></x-slot:icon>
                 Tambah Kamera
             </x-nawasara-ui::button>
-        </x-slot>
+        </x-nawasara-ui::page-header>
 
-        {{-- Search --}}
-        <div class="mb-4 max-w-sm">
-            <x-nawasara-ui::search-input wire:model.live.debounce.300ms="search"
-                placeholder="Cari nama, lokasi, atau IP..." />
-        </div>
+        {{-- Toolbar — search via filter-bar (konsisten dengan package lain) --}}
+        <x-nawasara-ui::filter-bar
+            search-model="search"
+            search-placeholder="Cari nama, lokasi, atau IP..." />
 
         @if ($this->cameras->isEmpty())
             <x-nawasara-ui::empty-state icon="lucide-video-off" title="Belum ada kamera"
@@ -24,71 +25,69 @@
                 </x-nawasara-ui::button>
             </x-nawasara-ui::empty-state>
         @else
-            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-                    <thead class="bg-gray-50 dark:bg-gray-900">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Nama</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Lokasi</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Alamat</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Channel</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium uppercase text-gray-500">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-                        @foreach ($this->cameras as $camera)
-                            <tr wire:key="camera-{{ $camera->id }}">
-                                <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
+            {{-- Tabel — pakai komponen x-table (sticky kolom Aksi saat scroll) --}}
+            <x-nawasara-ui::table
+                :headers="['Nama', 'Lokasi', 'Alamat', 'Channel', 'Codec', 'Status', 'Aksi']"
+                stickyLast>
+                <x-slot:table>
+                    @foreach ($this->cameras as $camera)
+                        <tr wire:key="camera-{{ $camera->id }}">
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-neutral-100">
+                                <div class="flex items-center gap-2">
                                     {{ $camera->name }}
                                     @unless ($camera->is_active)
                                         <x-nawasara-ui::badge color="neutral">nonaktif</x-nawasara-ui::badge>
                                     @endunless
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                                    {{ $camera->location ?: '—' }}
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
-                                    {{ $camera->ip_address }}:{{ $camera->rtsp_port }}
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                                    ch {{ $camera->channel }} /
-                                    {{ $camera->subtype === 0 ? 'main' : 'sub' }}
-                                </td>
-                                <td class="px-4 py-3 text-sm">
-                                    @if ($camera->health_status === 'online')
-                                        <x-nawasara-ui::badge color="success">online</x-nawasara-ui::badge>
-                                    @elseif ($camera->health_status === 'offline')
-                                        <x-nawasara-ui::badge color="danger">offline</x-nawasara-ui::badge>
-                                    @else
-                                        <x-nawasara-ui::badge color="neutral">belum diprobe</x-nawasara-ui::badge>
-                                    @endif
-                                </td>
-                                <td class="px-4 py-3 text-right">
-                                    <div class="flex justify-end gap-2">
-                                        <x-nawasara-ui::button variant="ghost" size="sm" color="secondary"
-                                            wire:click="openEdit({{ $camera->id }})" permission="cctv.camera.update">
-                                            <x-slot:icon><x-lucide-pencil class="size-4" /></x-slot:icon>
-                                            Edit
-                                        </x-nawasara-ui::button>
-                                        <x-nawasara-ui::button variant="ghost" size="sm" color="danger"
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                                {{ $camera->location ?: '—' }}
+                            </td>
+                            <td class="px-6 py-4 font-mono text-sm text-gray-600 dark:text-neutral-400">
+                                {{ $camera->ip_address }}:{{ $camera->rtsp_port }}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
+                                ch {{ $camera->channel }} / {{ $camera->subtype === 0 ? 'main' : 'sub' }}
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                @if ($camera->video_codec === 'h265')
+                                    <x-nawasara-ui::badge color="warning">H.265 · transcode</x-nawasara-ui::badge>
+                                @else
+                                    <x-nawasara-ui::badge color="neutral">{{ $camera->video_codec === 'h264' ? 'H.264' : 'auto' }}</x-nawasara-ui::badge>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 text-sm">
+                                @if ($camera->health_status === 'online')
+                                    <x-nawasara-ui::badge color="success" icon="lucide-circle-check">online</x-nawasara-ui::badge>
+                                @elseif ($camera->health_status === 'offline')
+                                    <x-nawasara-ui::badge color="danger" icon="lucide-circle-x">offline</x-nawasara-ui::badge>
+                                @else
+                                    <x-nawasara-ui::badge color="neutral">belum diprobe</x-nawasara-ui::badge>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex justify-end gap-1">
+                                    @can('cctv.camera.update')
+                                        <x-nawasara-ui::icon-button icon="pencil" tooltip="Edit kamera"
+                                            wire:click="openEdit({{ $camera->id }})" />
+                                    @endcan
+                                    @can('cctv.camera.delete')
+                                        <x-nawasara-ui::icon-button icon="trash-2" tooltip="Hapus kamera"
                                             wire:click="delete({{ $camera->id }})"
-                                            wire:confirm="Hapus kamera {{ $camera->name }}?"
-                                            permission="cctv.camera.delete">
-                                            <x-slot:icon><x-lucide-trash-2 class="size-4" /></x-slot:icon>
-                                            Hapus
-                                        </x-nawasara-ui::button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                                            wire:confirm="Hapus kamera {{ $camera->name }}?" />
+                                    @endcan
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </x-slot:table>
 
-            <div class="mt-4">
-                {{ $this->cameras->links('nawasara-ui::components.pagination') }}
-            </div>
+                <x-slot:footer>
+                    <div class="px-2">
+                        {{ $this->cameras->links('nawasara-ui::components.pagination') }}
+                    </div>
+                </x-slot:footer>
+            </x-nawasara-ui::table>
         @endif
     </x-nawasara-ui::page.container>
 

@@ -17,14 +17,14 @@ return [
                 'navigate' => true,
             ],
             [
-                'label' => 'Cameras',
+                'label' => 'Camera',
                 'icon' => 'lucide-video',
                 'url' => url($prefix.'/cameras'),
                 'permission' => 'cctv.camera.view',
                 'navigate' => true,
             ],
             [
-                'label' => 'Recordings',
+                'label' => 'Recording',
                 'icon' => 'lucide-film',
                 'url' => url($prefix.'/recordings'),
                 'permission' => 'cctv.recording.view',

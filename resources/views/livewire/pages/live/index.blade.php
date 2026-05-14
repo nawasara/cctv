@@ -1,27 +1,30 @@
 <div>
     <x-nawasara-ui::page.container>
-        <x-nawasara-ui::page.title>Live View</x-nawasara-ui::page.title>
-
-        <x-slot name="actions">
+        <x-nawasara-ui::page-header
+            title="Live View"
+            description="Pantau kamera CCTV secara real-time. Pilih kamera dari daftar.">
             @if ($this->sidecarReachable)
-                <x-nawasara-ui::badge color="success">go2rtc terhubung</x-nawasara-ui::badge>
+                <x-nawasara-ui::badge color="success" icon="lucide-circle-check">go2rtc terhubung</x-nawasara-ui::badge>
             @else
-                <x-nawasara-ui::badge color="danger">go2rtc tidak terhubung</x-nawasara-ui::badge>
+                <x-nawasara-ui::badge color="danger" icon="lucide-circle-x">go2rtc tidak terhubung</x-nawasara-ui::badge>
             @endif
-        </x-slot>
+        </x-nawasara-ui::page-header>
 
         @unless ($this->sidecarReachable)
-            <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800
-                        dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                Sidecar <span class="font-mono">go2rtc</span> tidak dapat dihubungi. Stream tidak akan tampil
-                sampai container go2rtc berjalan. Cek <span class="font-mono">CCTV_GO2RTC_API_URL</span> dan
-                status container.
+            <div class="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3
+                        text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-200">
+                <x-lucide-triangle-alert class="mt-0.5 size-4 shrink-0" />
+                <span>
+                    Sidecar <span class="font-mono">go2rtc</span> tidak dapat dihubungi. Stream tidak akan
+                    tampil sampai container go2rtc berjalan. Cek <span class="font-mono">CCTV_GO2RTC_API_URL</span>
+                    dan status container.
+                </span>
             </div>
         @endunless
 
         @if ($this->cameras->isEmpty())
             <x-nawasara-ui::empty-state icon="lucide-monitor-off" title="Belum ada kamera aktif"
-                description="Tambahkan kamera di menu Cameras, lalu pastikan statusnya aktif." />
+                description="Tambahkan kamera di menu Camera, lalu pastikan statusnya aktif." />
         @else
             {{--
                 Layout: sidebar daftar kamera (kiri) + grid video terpilih (kanan).
@@ -34,56 +37,68 @@
                   3. Semua video satu DOM — sidebar + grid gampang.
             --}}
             <div x-data="cctvLive('{{ $this->go2rtcPublicUrl }}')"
-                class="flex flex-col gap-4 lg:flex-row">
+                class="flex flex-col gap-5 lg:flex-row">
 
                 {{-- ============ SIDEBAR — daftar kamera ============ --}}
-                <aside class="w-full shrink-0 lg:w-72">
-                    <div class="rounded-lg border border-gray-200 dark:border-gray-800">
-                        <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3
-                                    dark:border-gray-800">
-                            <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-                                Daftar CCTV
-                            </h2>
-                            <span class="text-xs text-gray-500">
+                <aside class="w-full shrink-0 lg:w-80">
+                    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm
+                                dark:border-neutral-700 dark:bg-neutral-800">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3
+                                    dark:border-neutral-700">
+                            <div class="flex items-center gap-2">
+                                <x-lucide-cctv class="size-4 text-gray-400 dark:text-neutral-500" />
+                                <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">
+                                    Daftar CCTV
+                                </h2>
+                            </div>
+                            <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600
+                                         dark:bg-neutral-700 dark:text-neutral-300">
                                 {{ count($selected) }}/{{ \Nawasara\Cctv\Livewire\Live\Index::MAX_SELECTED }}
                             </span>
                         </div>
 
-                        <ul class="max-h-[28rem] overflow-y-auto p-2">
+                        <ul class="max-h-[30rem] space-y-1 overflow-y-auto p-2
+                                   [&::-webkit-scrollbar]:w-1.5
+                                   [&::-webkit-scrollbar-thumb]:rounded-full
+                                   [&::-webkit-scrollbar-thumb]:bg-gray-200
+                                   dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
                             @foreach ($this->cameras as $camera)
                                 @php $isSelected = in_array($camera->slug, $selected, true); @endphp
                                 <li wire:key="cam-li-{{ $camera->id }}">
                                     <button type="button"
                                         wire:click="toggle('{{ $camera->slug }}')"
                                         @class([
-                                            'flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition',
-                                            'bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200' => $isSelected,
-                                            'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-900' => ! $isSelected,
+                                            'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                                            'bg-emerald-50 text-emerald-900 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-200 dark:ring-emerald-800/60' => $isSelected,
+                                            'text-gray-700 hover:bg-gray-50 dark:text-neutral-300 dark:hover:bg-neutral-700/50' => ! $isSelected,
                                         ])>
                                         {{-- indikator terpilih --}}
                                         <span @class([
-                                            'flex size-4 shrink-0 items-center justify-center rounded border',
+                                            'flex size-5 shrink-0 items-center justify-center rounded-md border transition-colors',
                                             'border-emerald-600 bg-emerald-600 text-white' => $isSelected,
-                                            'border-gray-300 dark:border-gray-700' => ! $isSelected,
+                                            'border-gray-300 dark:border-neutral-600' => ! $isSelected,
                                         ])>
                                             @if ($isSelected)
-                                                <x-lucide-check class="size-3" />
+                                                <x-lucide-check class="size-3.5" />
                                             @endif
                                         </span>
 
                                         <span class="min-w-0 flex-1">
                                             <span class="block truncate font-medium">{{ $camera->name }}</span>
-                                            <span class="block truncate text-xs text-gray-500">
+                                            <span class="block truncate text-xs text-gray-500 dark:text-neutral-400">
                                                 {{ $camera->location ?: '—' }}
                                             </span>
                                         </span>
 
                                         {{-- status online/offline --}}
                                         @if ($camera->isOnline())
-                                            <span class="size-2 shrink-0 rounded-full bg-green-500"
-                                                title="online"></span>
+                                            <span class="flex size-2.5 shrink-0">
+                                                <span class="absolute inline-flex size-2.5 animate-ping rounded-full
+                                                             bg-green-400 opacity-60"></span>
+                                                <span class="relative inline-flex size-2.5 rounded-full bg-green-500"></span>
+                                            </span>
                                         @else
-                                            <span class="size-2 shrink-0 rounded-full bg-rose-500"
+                                            <span class="size-2.5 shrink-0 rounded-full bg-rose-500"
                                                 title="offline"></span>
                                         @endif
                                     </button>
@@ -92,18 +107,20 @@
                         </ul>
 
                         @if (count($selected) > 0)
-                            <div class="border-t border-gray-200 p-2 dark:border-gray-800">
+                            <div class="border-t border-gray-100 p-2 dark:border-neutral-700">
                                 <button type="button" wire:click="clearSelection"
-                                    class="w-full rounded-md px-3 py-1.5 text-xs text-gray-500
+                                    class="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2
+                                           text-xs font-medium text-gray-500 transition-colors
                                            hover:bg-gray-50 hover:text-gray-700
-                                           dark:hover:bg-gray-900 dark:hover:text-gray-300">
+                                           dark:hover:bg-neutral-700/50 dark:hover:text-neutral-200">
+                                    <x-lucide-x class="size-3.5" />
                                     Kosongkan pilihan
                                 </button>
                             </div>
                         @endif
                     </div>
 
-                    <p class="mt-2 px-1 text-xs text-gray-400">
+                    <p class="mt-2.5 px-1 text-xs text-gray-400 dark:text-neutral-500">
                         Klik kamera untuk menonton. Maksimal
                         {{ \Nawasara\Cctv\Livewire\Live\Index::MAX_SELECTED }} kamera bersamaan.
                     </p>
@@ -112,20 +129,24 @@
                 {{-- ============ GRID VIDEO — kamera terpilih ============ --}}
                 <div class="min-w-0 flex-1">
                     @if ($this->selectedCameras->isEmpty())
-                        <div class="flex h-64 items-center justify-center rounded-lg border border-dashed
-                                    border-gray-300 text-sm text-gray-400 dark:border-gray-700">
-                            Pilih kamera dari daftar untuk mulai menonton.
+                        <div class="flex h-72 flex-col items-center justify-center gap-2 rounded-xl
+                                    border border-dashed border-gray-300 text-gray-400
+                                    dark:border-neutral-700 dark:text-neutral-500">
+                            <x-lucide-monitor-play class="size-10" />
+                            <p class="text-sm">Pilih kamera dari daftar untuk mulai menonton.</p>
                         </div>
                     @else
                         {{-- 1 kamera = full width; 2+ = grid 2 kolom (maks 2x2) --}}
                         <div @class([
-                            'grid gap-3',
+                            'grid gap-4',
                             'grid-cols-1' => $this->selectedCameras->count() === 1,
                             'grid-cols-1 sm:grid-cols-2' => $this->selectedCameras->count() > 1,
                         ])>
                             @foreach ($this->selectedCameras as $camera)
                                 <div wire:key="live-{{ $camera->id }}"
-                                    class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+                                    class="group overflow-hidden rounded-xl border border-gray-200 bg-white
+                                           shadow-sm transition-shadow hover:shadow-md
+                                           dark:border-neutral-700 dark:bg-neutral-800">
                                     {{-- video-stream web component di-mount oleh Alpine.
                                          wire:ignore — jangan biarkan Livewire patch ulang
                                          DOM video (akan putus koneksi WebRTC tiap render). --}}
@@ -134,20 +155,29 @@
                                         x-data="{ slug: '{{ $camera->slug }}' }"
                                         x-init="mountStream($el, slug)">
                                         {{-- <video-stream> disuntik di sini oleh mountStream() --}}
+
+                                        {{-- LIVE badge overlay --}}
+                                        <span class="absolute left-2 top-2 z-10 inline-flex items-center gap-1
+                                                     rounded-md bg-black/60 px-1.5 py-0.5 text-[10px]
+                                                     font-semibold uppercase tracking-wide text-white
+                                                     backdrop-blur-sm">
+                                            <span class="size-1.5 rounded-full bg-red-500"></span>
+                                            Live
+                                        </span>
                                     </div>
-                                    <div class="flex items-center justify-between px-3 py-2">
+                                    <div class="flex items-center justify-between gap-2 px-4 py-3">
                                         <div class="min-w-0">
-                                            <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            <p class="truncate text-sm font-semibold text-gray-900 dark:text-neutral-100">
                                                 {{ $camera->name }}
                                             </p>
-                                            <p class="truncate text-xs text-gray-500">
+                                            <p class="truncate text-xs text-gray-500 dark:text-neutral-400">
                                                 {{ $camera->location ?: '—' }}
                                             </p>
                                         </div>
                                         <button type="button" wire:click="toggle('{{ $camera->slug }}')"
-                                            class="shrink-0 rounded-md p-1.5 text-gray-400 transition
+                                            class="shrink-0 rounded-lg p-2 text-gray-400 transition-colors
                                                    hover:bg-rose-50 hover:text-rose-600
-                                                   dark:hover:bg-rose-950"
+                                                   dark:hover:bg-rose-950/50"
                                             title="Tutup kamera ini">
                                             <x-lucide-x class="size-4" />
                                         </button>
