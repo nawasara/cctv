@@ -31,6 +31,7 @@ class Index extends Component
     public ?int $editingId = null;
 
     public string $name = '';
+    public bool $sync_title = true;
     public string $location = '';
     public string $ip_address = '';
     public int $rtsp_port = 554;
@@ -47,6 +48,7 @@ class Index extends Component
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'sync_title' => ['boolean'],
             'location' => ['nullable', 'string', 'max:255'],
             'ip_address' => ['required', 'ip'],
             'rtsp_port' => ['required', 'integer', 'min:1', 'max:65535'],
@@ -97,6 +99,7 @@ class Index extends Component
 
         $this->editingId = $camera->id;
         $this->name = $camera->name;
+        $this->sync_title = $camera->sync_title;
         $this->location = (string) $camera->location;
         $this->ip_address = $camera->ip_address;
         $this->rtsp_port = $camera->rtsp_port;
@@ -122,6 +125,7 @@ class Index extends Component
             $camera = Camera::findOrFail($this->editingId);
             $camera->fill([
                 'name' => $validated['name'],
+                'sync_title' => $validated['sync_title'],
                 'location' => $validated['location'] ?: null,
                 'ip_address' => $validated['ip_address'],
                 'rtsp_port' => $validated['rtsp_port'],
@@ -141,6 +145,7 @@ class Index extends Component
         } else {
             $camera = Camera::create([
                 'name' => $validated['name'],
+                'sync_title' => $validated['sync_title'],
                 'location' => $validated['location'] ?: null,
                 'slug' => $this->uniqueSlug($validated['name']),
                 'ip_address' => $validated['ip_address'],
@@ -197,6 +202,7 @@ class Index extends Component
         $this->channel = 1;
         $this->subtype = 0;
         $this->video_codec = 'auto';
+        $this->sync_title = true;
         $this->is_active = true;
         $this->recording_enabled = false;
         $this->resetValidation();

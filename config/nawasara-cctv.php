@@ -38,6 +38,11 @@ return [
         'rtsp_port' => env('CCTV_DAHUA_RTSP_PORT', 554),
         'http_port' => env('CCTV_DAHUA_HTTP_PORT', 80),
 
+        // Timeout (detik) untuk panggilan HTTP CGI API Dahua — dipakai
+        // DahuaClient untuk baca ChannelTitle. Device kadang lambat
+        // respond, kasih headroom.
+        'http_timeout' => env('CCTV_DAHUA_HTTP_TIMEOUT', 12),
+
         // Template path RTSP. {channel} dan {subtype} di-substitusi per kamera.
         // Dipisah dari kredensial — kredensial di-inject saat build URL penuh
         // supaya tidak pernah ke-log.

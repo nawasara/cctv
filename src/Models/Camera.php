@@ -23,6 +23,7 @@ class Camera extends Model
 
     protected $fillable = [
         'name',
+        'sync_title',
         'location',
         'slug',
         'ip_address',
@@ -45,6 +46,7 @@ class Camera extends Model
         'username' => 'encrypted',
         'password' => 'encrypted',
         'is_active' => 'boolean',
+        'sync_title' => 'boolean',
         'recording_enabled' => 'boolean',
         'channel' => 'integer',
         'subtype' => 'integer',
@@ -69,6 +71,7 @@ class Camera extends Model
         return LogOptions::defaults()
             ->logOnly([
                 'name',
+                'sync_title',
                 'location',
                 'slug',
                 'ip_address',

@@ -9,7 +9,9 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Nawasara\Cctv\Console\Commands\ProbeCamerasCommand;
 use Nawasara\Cctv\Console\Commands\SyncGo2rtcCommand;
+use Nawasara\Cctv\Console\Commands\SyncTitlesCommand;
 use Nawasara\Cctv\Services\CameraHealthProbe;
+use Nawasara\Cctv\Services\DahuaClient;
 use Nawasara\Cctv\Services\Go2rtcClient;
 use Symfony\Component\Finder\Finder;
 
@@ -28,6 +30,10 @@ class CctvServiceProvider extends ServiceProvider
             (int) config('nawasara-cctv.health.probe_timeout'),
             (int) config('nawasara-cctv.health.failure_threshold'),
         ));
+
+        $this->app->singleton(DahuaClient::class, fn () => new DahuaClient(
+            (int) config('nawasara-cctv.dahua.http_timeout', 12),
+        ));
     }
 
     public function boot(): void
@@ -37,6 +43,7 @@ class CctvServiceProvider extends ServiceProvider
             $this->commands([
                 ProbeCamerasCommand::class,
                 SyncGo2rtcCommand::class,
+                SyncTitlesCommand::class,
             ]);
         }
 
@@ -71,6 +78,15 @@ class CctvServiceProvider extends ServiceProvider
             $schedule->command('cctv:sync-go2rtc')
                 ->hourly()
                 ->withoutOverlapping(10)
+                ->runInBackground();
+
+            // Sinkronisasi nama kamera dari ChannelTitle device Dahua —
+            // sekali sehari cukup (nama jarang berubah; operator rename
+            // kamera di device itu kejadian langka). Hanya kamera dengan
+            // sync_title aktif yang ter-update.
+            $schedule->command('cctv:sync-titles')
+                ->dailyAt('03:00')
+                ->withoutOverlapping(30)
                 ->runInBackground();
         });
     }

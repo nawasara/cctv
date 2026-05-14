@@ -170,6 +170,12 @@
                     Aktif (stream didaftarkan ke go2rtc)
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" wire:model="sync_title"
+                        class="rounded border-gray-300 text-emerald-700 focus:ring-emerald-700">
+                    Sinkronkan nama dari device Dahua
+                    <span class="text-xs text-gray-400">(matikan untuk nama custom)</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                     <input type="checkbox" wire:model="recording_enabled"
                         class="rounded border-gray-300 text-emerald-700 focus:ring-emerald-700">
                     Aktifkan perekaman
