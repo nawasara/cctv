@@ -32,11 +32,15 @@
                         Kembali ke grid
                     </x-nawasara-ui::button>
                 </div>
-                <div class="rounded-lg border border-gray-200 bg-black dark:border-gray-800">
-                    <div class="aspect-video w-full" wire:ignore>
+                <div class="overflow-hidden rounded-lg border border-gray-200 bg-black dark:border-gray-800">
+                    {{-- aspect-video frame; iframe absolutely fills it so go2rtc's
+                         player stretches edge-to-edge instead of sitting native-size
+                         in the middle with letterbox + scrollbars. --}}
+                    <div class="relative aspect-video w-full" wire:ignore>
                         <iframe
-                            src="{{ $this->go2rtcPublicUrl }}/webrtc.html?src={{ urlencode($cam->slug) }}"
-                            class="h-full w-full rounded-lg" allow="autoplay; fullscreen"
+                            src="{{ $this->go2rtcPublicUrl }}/stream.html?src={{ urlencode($cam->slug) }}&mode={{ $this->defaultMode }}"
+                            class="absolute inset-0 h-full w-full border-0"
+                            scrolling="no" allow="autoplay; fullscreen"
                             referrerpolicy="no-referrer"></iframe>
                     </div>
                 </div>
@@ -58,10 +62,13 @@
                 @foreach ($this->cameras as $camera)
                     <div wire:key="live-{{ $camera->id }}"
                         class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
-                        <div class="aspect-video w-full bg-black" wire:ignore>
+                        {{-- relative + absolute-fill iframe: go2rtc player stretches
+                             to fill the 16:9 cell, no letterbox / scrollbar. --}}
+                        <div class="relative aspect-video w-full bg-black" wire:ignore>
                             <iframe
-                                src="{{ $this->go2rtcPublicUrl }}/webrtc.html?src={{ urlencode($camera->slug) }}"
-                                class="h-full w-full" loading="lazy" allow="autoplay"
+                                src="{{ $this->go2rtcPublicUrl }}/stream.html?src={{ urlencode($camera->slug) }}&mode={{ $this->defaultMode }}"
+                                class="absolute inset-0 h-full w-full border-0"
+                                scrolling="no" loading="lazy" allow="autoplay"
                                 referrerpolicy="no-referrer"></iframe>
                         </div>
                         <div class="flex items-center justify-between px-3 py-2">
