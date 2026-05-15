@@ -21,10 +21,26 @@ return [
         // HTTP timeout untuk panggilan API go2rtc (detik).
         'timeout' => env('CCTV_GO2RTC_TIMEOUT', 10),
 
-        // Mode playback default di browser. 'webrtc' = latency terendah,
-        // 'mse' = fallback kompatibel, 'hls' = paling kompatibel tapi delay
-        // beberapa detik. Frontend bisa override per-kamera.
-        'default_mode' => env('CCTV_GO2RTC_MODE', 'webrtc'),
+        // Mode playback default di browser:
+        //
+        //   'webrtc' — latency terendah (<500ms), TAPI butuh port 8555 TCP/UDP
+        //              reachable LANGSUNG dari browser ke server. TIDAK jalan
+        //              di balik reverse-proxy HTTP-only (cloudflared, dll).
+        //
+        //   'mse'    — Media Source Extensions, latency ~500ms-2s. Stream
+        //              di-tunnel lewat WebSocket signaling yang SAMA dengan
+        //              HTTP — jalan sempurna lewat cloudflared / reverse-proxy.
+        //              Default. Pilih ini untuk deployment di balik tunnel.
+        //
+        //   'mp4'    — progressive MP4 fragmented over HTTP. Latency 1-3s,
+        //              fallback paling kompatibel kalau MSE tidak didukung.
+        //
+        //   'hls'    — HLS manifest + segmen. Latency 5-10s, paling kompatibel
+        //              (semua browser, semua mobile). Untuk live monitoring
+        //              terlalu lambat — pakai cuma kalau dua opsi di atas gagal.
+        //
+        // Frontend bisa override per-kamera nanti via param di URL stream.
+        'default_mode' => env('CCTV_GO2RTC_MODE', 'mse'),
     ],
 
     // -------------------------------------------------------------------------
