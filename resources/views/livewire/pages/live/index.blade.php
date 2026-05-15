@@ -202,8 +202,19 @@
             @script
             <script>
                 Alpine.data('cctvLive', (go2rtcBase) => ({
-                    // base URL go2rtc untuk browser; pastikan tanpa trailing slash
-                    base: go2rtcBase.replace(/\/$/, ''),
+                    // base URL go2rtc untuk browser. Bisa absolut
+                    // ('http://localhost:1984', dev lokal) ATAU path relatif
+                    // ('/go2rtc', server lewat reverse-proxy nginx). Resolve
+                    // ke absolut via location.origin supaya `new URL(...)`
+                    // tidak error 'Invalid base URL' untuk path relatif.
+                    // Tanpa trailing slash di akhir, supaya '/api/...' konsisten.
+                    base: (() => {
+                        const cleaned = go2rtcBase.replace(/\/$/, '');
+                        // Sudah absolut (http:// / https:// / //) -> apa adanya.
+                        if (/^(https?:)?\/\//i.test(cleaned)) return cleaned;
+                        // Path relatif -> prefix dengan origin halaman saat ini.
+                        return window.location.origin + (cleaned.startsWith('/') ? cleaned : '/' + cleaned);
+                    })(),
 
                     // Promise modul go2rtc — di-load sekali, di-share semua stream.
                     _modulePromise: null,
@@ -241,6 +252,7 @@
                         el.background = true;
                         el.mode = '{{ $this->defaultMode }}';
                         // WebSocket signaling endpoint go2rtc untuk stream ini.
+                        // this.base sekarang dijamin absolut (lihat getter di atas).
                         el.src = new URL(
                             `api/ws?src=${encodeURIComponent(slug)}`,
                             this.base + '/'
