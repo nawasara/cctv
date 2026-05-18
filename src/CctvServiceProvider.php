@@ -4,6 +4,7 @@ namespace Nawasara\Cctv;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -57,6 +58,8 @@ class CctvServiceProvider extends ServiceProvider
         }
 
         $this->registerLivewire();
+        $this->registerApiScopes();
+        $this->registerApiRoutes();
 
         $this->app->booted(function () {
             if (! $this->app->runningInConsole()) {
@@ -120,5 +123,63 @@ class CctvServiceProvider extends ServiceProvider
                 Livewire::component($alias, $class);
             }
         }
+    }
+
+    /**
+     * Register API scope ke nawasara/api scope registry. Guard `class_exists`
+     * supaya package tetap jalan kalau nawasara/api tidak ter-install
+     * (CCTV adalah self-contained, API exposure opsional).
+     */
+    public function registerApiScopes(): void
+    {
+        if (! class_exists(\Nawasara\Api\Support\ScopeRegistry::class)) {
+            return;
+        }
+
+        $registry = $this->app->make(\Nawasara\Api\Support\ScopeRegistry::class);
+
+        $registry->register(
+            'cctv.camera.read',
+            'List + detail kamera publik (slug, nama, lokasi, koordinat, status). TIDAK include kredensial atau RTSP URL.',
+        );
+
+        $registry->register(
+            'cctv.camera.stream',
+            'Generate signed proxy URL ke stream go2rtc. Stream di-proxy lewat Nawasara — kredensial Dahua tidak ter-expose.',
+        );
+
+        $registry->register(
+            'cctv.recording.read',
+            'List + download rekaman (engine recording belum aktif di v0.1.x — placeholder).',
+        );
+    }
+
+    /**
+     * Mount route API ke prefix /api/v1/cctv. Cuma jalan kalau package
+     * nawasara/api terpasang (middleware api.auth, api.log, scope wajib ada).
+     *
+     * Verify endpoint untuk Nginx auth_request di-mount terpisah TANPA
+     * api.auth — signed URL adalah auth-nya.
+     */
+    public function registerApiRoutes(): void
+    {
+        if (! class_exists(\Nawasara\Api\ApiServiceProvider::class)) {
+            return;
+        }
+
+        $prefix = (string) config('nawasara-api.route.prefix', 'api/v1').'/cctv';
+
+        // Routes utama: butuh API token + scope.
+        Route::prefix($prefix)
+            ->middleware(['api', 'api.auth', 'api.log'])
+            ->name('nawasara-api.cctv.')
+            ->group(__DIR__.'/../routes/api.php');
+
+        // Stream verify endpoint untuk Nginx auth_request. Tidak butuh
+        // token — auth via signed URL.
+        Route::prefix($prefix)
+            ->middleware(['api'])
+            ->name('nawasara-api.cctv.stream-verify')
+            ->get('stream/{slug}', [\Nawasara\Cctv\Http\Api\StreamProxyController::class, 'verify']);
     }
 }
