@@ -80,7 +80,12 @@ class CameraController extends Controller
         $signed = $signer->sign(['slug' => $camera->slug]);
         $exp = $signed['exp'];
 
-        $streamUrl = url("/api/v1/cctv/stream/{$camera->slug}")
+        // Pakai subdomain stream khusus kalau di-set, fallback ke APP_URL.
+        // Subdomain terpisah di-route via Cloudflare Tunnel (lebih reliable
+        // untuk WebSocket cross-origin daripada Cloudflare HTTP proxy).
+        $base = rtrim((string) config('nawasara-cctv.go2rtc.stream_url_base') ?: url(''), '/');
+
+        $streamUrl = $base."/api/v1/cctv/stream/{$camera->slug}"
             .'?sig='.$signed['sig']
             .'&exp='.$exp;
 

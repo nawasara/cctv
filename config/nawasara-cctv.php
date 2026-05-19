@@ -41,6 +41,16 @@ return [
         //
         // Frontend bisa override per-kamera nanti via param di URL stream.
         'default_mode' => env('CCTV_GO2RTC_MODE', 'mse'),
+
+        // Base URL untuk signed stream URL yang di-generate `CameraController::stream`.
+        // Optional — kalau kosong, fallback ke APP_URL.
+        //
+        // Kenapa terpisah dari APP_URL: di production di balik Cloudflare proxy
+        // HTTP-only, WebSocket cross-origin (gasta.* → nawasara-dev.*) kadang
+        // di-block / unreliable. Pakai subdomain khusus dengan Cloudflare Tunnel
+        // (tunnel support WS lebih baik) supaya stream stabil tanpa migrasi
+        // seluruh app. Format: `https://cctv-stream.ponorogo.go.id`
+        'stream_url_base' => env('CCTV_STREAM_URL_BASE'),
     ],
 
     // -------------------------------------------------------------------------
