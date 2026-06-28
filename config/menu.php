@@ -4,8 +4,9 @@ $prefix = 'nawasara-cctv';
 
 return [
     [
-        'label' => 'CCTV Monitoring',
+        'label' => 'CCTV',
         'icon' => 'lucide-cctv',
+        'group' => 'Observability',
         'url' => '',
         'permission' => 'cctv.camera.view',
         'submenu' => [
