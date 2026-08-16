@@ -38,6 +38,9 @@
                                     @unless ($camera->is_active)
                                         <x-nawasara-ui::badge color="neutral">nonaktif</x-nawasara-ui::badge>
                                     @endunless
+                                    @if ($camera->is_public)
+                                        <x-nawasara-ui::badge color="warning">publik</x-nawasara-ui::badge>
+                                    @endif
                                 </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600 dark:text-neutral-400">
@@ -194,6 +197,16 @@
                         class="rounded border-gray-300 text-emerald-700 focus:ring-emerald-700">
                     Aktifkan perekaman
                     <span class="text-xs text-gray-400">(engine perekaman menyusul)</span>
+                </label>
+                {{-- Terpisah dari "Aktif": kamera bisa perlu hidup untuk
+                     keperluan operasional tanpa boleh ditonton siapa saja. --}}
+                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" wire:model="is_public"
+                        class="rounded border-gray-300 text-emerald-700 focus:ring-emerald-700">
+                    Tampilkan di aplikasi warga
+                    <span class="text-xs text-amber-600 dark:text-amber-400">
+                        (dapat ditonton siapa saja — pastikan gambarnya layak publik)
+                    </span>
                 </label>
             </div>
 

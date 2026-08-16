@@ -181,5 +181,14 @@ class CctvServiceProvider extends ServiceProvider
             ->middleware(['api'])
             ->name('nawasara-api.cctv.stream-verify')
             ->get('stream/{slug}', [\Nawasara\Cctv\Http\Api\StreamProxyController::class, 'verify']);
+
+        // Rute aplikasi warga — JWT realm warga, bukan token sistem. Prefix
+        // terpisah supaya kedua khalayak tidak pernah berbagi jalur, dan
+        // pembatasan lajunya sendiri karena pemanggilnya puluhan ribu ponsel,
+        // bukan segelintir sistem.
+        Route::prefix((string) config('nawasara-api.route.prefix', 'api/v1').'/citizen/cctv')
+            ->middleware(['api', 'api.citizen', 'throttle:nawasara-citizen'])
+            ->name('nawasara-api.citizen.cctv.')
+            ->group(__DIR__.'/../routes/citizen.php');
     }
 }

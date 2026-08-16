@@ -44,6 +44,10 @@ class Index extends Component
     public string $username = '';
     public string $password = '';
     public bool $is_active = true;
+    // Bawaan tertutup. Membuka kamera ke aplikasi warga harus keputusan sadar
+    // admin setelah melihat apa yang tertangkap gambarnya, bukan akibat lupa
+    // mematikan sesuatu saat menambah kamera baru.
+    public bool $is_public = false;
     public bool $recording_enabled = false;
 
     protected function rules(): array
@@ -64,6 +68,7 @@ class Index extends Component
             // Password wajib saat create; saat edit boleh kosong (= tidak diubah).
             'password' => [$this->editingId ? 'nullable' : 'required', 'string', 'max:255'],
             'is_active' => ['boolean'],
+            'is_public' => ['boolean'],
             'recording_enabled' => ['boolean'],
         ];
     }
@@ -116,6 +121,7 @@ class Index extends Component
         $this->username = $camera->username;
         $this->password = ''; // jangan echo password balik — kosongkan
         $this->is_active = $camera->is_active;
+        $this->is_public = $camera->is_public;
         $this->recording_enabled = $camera->recording_enabled;
 
         $this->showForm = true;
@@ -143,6 +149,7 @@ class Index extends Component
                 'video_codec' => $validated['video_codec'],
                 'username' => $validated['username'],
                 'is_active' => $validated['is_active'],
+                'is_public' => $validated['is_public'],
                 'recording_enabled' => $validated['recording_enabled'],
             ]);
             // Password hanya di-set kalau user mengisi ulang.
@@ -167,6 +174,7 @@ class Index extends Component
                 'username' => $validated['username'],
                 'password' => $validated['password'],
                 'is_active' => $validated['is_active'],
+                'is_public' => $validated['is_public'],
                 'recording_enabled' => $validated['recording_enabled'],
             ]);
         }
@@ -214,6 +222,7 @@ class Index extends Component
         $this->video_codec = 'auto';
         $this->sync_title = true;
         $this->is_active = true;
+        $this->is_public = false;
         $this->recording_enabled = false;
         $this->resetValidation();
     }

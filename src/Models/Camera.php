@@ -37,6 +37,7 @@ class Camera extends Model
         'username',
         'password',
         'is_active',
+        'is_public',
         'health_status',
         'failure_count',
         'last_seen_at',
@@ -48,6 +49,7 @@ class Camera extends Model
         'username' => 'encrypted',
         'password' => 'encrypted',
         'is_active' => 'boolean',
+        'is_public' => 'boolean',
         'sync_title' => 'boolean',
         'recording_enabled' => 'boolean',
         'channel' => 'integer',
@@ -87,6 +89,10 @@ class Camera extends Model
                 'subtype',
                 'video_codec',
                 'is_active',
+                // Siapa membuka / menutup kamera ke publik wajib tercatat —
+                // ini keputusan yang menyangkut apa yang dapat dilihat siapa
+                // saja, bukan sekadar setelan operasional.
+                'is_public',
                 'recording_enabled',
             ])
             ->logOnlyDirty()
