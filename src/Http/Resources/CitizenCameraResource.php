@@ -31,6 +31,11 @@ class CitizenCameraResource extends JsonResource
             'name' => $this->name,
             'location' => $this->location,
 
+            // Null bila belum dikategorikan — aplikasi menampilkannya pada
+            // saringan "Semua". Memaksa nilai bawaan akan menaruh kamera lama
+            // di kategori yang belum tentu benar.
+            'category' => $this->category,
+
             'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
             'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
 

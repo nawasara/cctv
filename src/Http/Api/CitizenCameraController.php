@@ -46,6 +46,12 @@ class CitizenCameraController extends Controller
     {
         $query = $this->publicCameras()->orderBy('name');
 
+        // Saringan kategori — layar CCTV menawarkan Pusat Kota, Lalu Lintas,
+        // Wisata, Pasar, Siaga Bencana.
+        if (($category = $request->query('category')) !== null && $category !== '') {
+            $query->where('category', (string) $category);
+        }
+
         if ($request->boolean('mappable')) {
             $query->whereNotNull('latitude')->whereNotNull('longitude');
         }
