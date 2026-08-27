@@ -175,25 +175,67 @@ class Go2rtcClient
      * GOP-nya — dua sampai empat detik bukan hal aneh. Memakai batas waktu
      * yang sama membuat tangkapan gagal justru pada kamera yang sehat.
      */
-    public function frame(Camera $camera, int $timeoutSeconds = 10): ?string
+    /**
+     * Ukuran minimal bingkai yang dianggap BERISI GAMBAR.
+     *
+     * ⚠️ Bingkai abu-abu tetap JPEG yang sah dan tetap dijawab 200 — ia hanya
+     * kecil, karena bidang polos hampir tidak menghasilkan data terkompresi.
+     * Tanpa ambang ini, gambar abu tersimpan ke cache dan warga melihatnya
+     * selama tiga puluh detik berikutnya.
+     *
+     * Diukur di produksi 27 Agustus 2026:
+     *
+     *   dingin  6,5 – 10 KB    abu, keyframe belum tiba
+     *   hangat   42 – 70 KB    gambar sungguhan
+     *
+     * 20 KB dipilih di tengah jurang itu — cukup tinggi untuk menolak yang
+     * abu, cukup rendah untuk menerima pemandangan malam yang gelap dan
+     * memang berukuran kecil.
+     */
+    private const MIN_FRAME_BYTES = 20000;
+
+    /**
+     * Menangkap satu bingkai JPEG dari go2rtc.
+     *
+     * ⚠️ **Aliran dihangatkan lebih dulu, dan itu bukan pemborosan.**
+     *
+     * go2rtc menyambung ke kamera hanya saat ada yang meminta. Permintaan
+     * bingkai pertama datang sebelum keyframe tiba, sehingga yang dikembalikan
+     * adalah bidang abu — 200, JPEG sah, dan **salah**. Itulah gambar abu yang
+     * terlihat di aplikasi warga.
+     *
+     * Membuka `stream.mp4` beberapa detik memaksa aliran benar-benar mengalir;
+     * bingkai setelahnya berisi gambar sungguhan. Diukur: 9,9 KB menjadi
+     * 42,3 KB pada kamera yang sama.
+     *
+     * ⚠️ `?duration=` TIDAK menolong — sudah diuji, hasilnya tetap ~10 KB.
+     * Yang menentukan aliran sudah mengalir, bukan lamanya menunggu.
+     */
+    public function frame(Camera $camera, int $timeoutSeconds = 10, bool $warmUp = false): ?string
     {
         try {
-            $response = Http::baseUrl(rtrim($this->apiUrl, '/'))
-                ->timeout($timeoutSeconds)
-                ->withQueryParameters(['src' => $camera->slug])
-                ->get('/api/frame.jpeg');
+            $body = $this->grabFrame($camera, $timeoutSeconds);
 
-            if (! $response->successful()) {
-                return null;
+            // Bingkai yang terlalu kecil berarti aliran belum panas.
+            //
+            // ⚠️ Pemanasan HANYA dilakukan bila diminta — dan permintaan warga
+            // TIDAK memintanya. Pemanasan memakan enam detik, dan ditambah dua
+            // penangkapan totalnya dapat melewati dua puluh detik; warga yang
+            // menunggu gambar akan menyerah lebih dulu.
+            //
+            // Yang menghangatkan adalah probe terjadwal, di latar. Ia
+            // menyimpan hasilnya ke cache, sehingga permintaan warga
+            // berikutnya menerima bingkai yang sudah berisi tanpa menunggu
+            // sama sekali.
+            if ($warmUp && $body !== null && strlen($body) < self::MIN_FRAME_BYTES) {
+                $this->warmUp($camera);
+
+                // Sekali saja. Kamera yang memang gelap tidak akan membesar
+                // berapa kali pun dicoba.
+                $body = $this->grabFrame($camera, $timeoutSeconds) ?? $body;
             }
 
-            $body = $response->body();
-
-            // go2rtc dapat menjawab 200 dengan badan kosong bila stream-nya
-            // terdaftar tetapi kameranya tidak menjawab. Menyimpan itu ke
-            // cache berarti warga melihat gambar rusak selama 30 detik
-            // berikutnya.
-            return $body === '' ? null : $body;
+            return $body;
         } catch (\Throwable $e) {
             // Hanya slug yang dicatat — jangan pernah menuliskan URL sumber,
             // ia memuat kredensial RTSP (lihat catatan kelas).
@@ -205,4 +247,53 @@ class Go2rtcClient
             return null;
         }
     }
+
+    /** Satu kali tangkap, tanpa pemanasan. */
+    private function grabFrame(Camera $camera, int $timeoutSeconds): ?string
+    {
+        $response = Http::baseUrl(rtrim($this->apiUrl, '/'))
+            ->timeout($timeoutSeconds)
+            ->withQueryParameters(['src' => $camera->slug])
+            ->get('/api/frame.jpeg');
+
+        if (! $response->successful()) {
+            return null;
+        }
+
+        $body = $response->body();
+
+        // go2rtc dapat menjawab 200 dengan badan kosong bila stream-nya
+        // terdaftar tetapi kameranya tidak menjawab. Menyimpan itu ke cache
+        // berarti warga melihat gambar rusak selama 30 detik berikutnya.
+        return $body === '' ? null : $body;
+    }
+
+    /**
+     * Memaksa aliran mengalir dengan membukanya sebentar.
+     *
+     * Sengaja MENGABAIKAN hasilnya: yang dibutuhkan efek sampingnya — go2rtc
+     * menyambung ke kamera dan keyframe mulai datang. Timeout-nya pendek dan
+     * kegagalannya ditelan, karena penangkapan berikutnya yang akan menjawab
+     * berhasil atau tidak.
+     */
+    private function warmUp(Camera $camera): void
+    {
+        try {
+            Http::baseUrl(rtrim($this->apiUrl, '/'))
+                ->timeout(self::WARMUP_SECONDS)
+                ->withQueryParameters(['src' => $camera->slug])
+                ->get('/api/stream.mp4');
+        } catch (\Throwable) {
+            // Timeout memang diharapkan — aliran tidak pernah berakhir sendiri.
+        }
+    }
+
+    /**
+     * Berapa lama aliran dibiarkan mengalir sebelum bingkai ditangkap ulang.
+     *
+     * Diukur: enam detik cukup untuk kamera Dahua di jaringan ini. Terlalu
+     * pendek mengembalikan bingkai abu lagi; terlalu panjang menahan
+     * permintaan warga yang sedang menunggu gambar.
+     */
+    private const WARMUP_SECONDS = 6;
 }

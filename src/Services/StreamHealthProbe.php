@@ -2,6 +2,7 @@
 
 namespace Nawasara\Cctv\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Nawasara\Cctv\Models\Camera;
 
 /**
@@ -33,6 +34,15 @@ use Nawasara\Cctv\Models\Camera;
  */
 class StreamHealthProbe
 {
+    /**
+     * Umur cache bingkai hasil probe.
+     *
+     * Sedikit lebih panjang daripada selang probe (10 menit) supaya tidak ada
+     * celah tempat cache sudah kosong sementara probe berikutnya belum
+     * berjalan — di celah itulah warga akan menerima bingkai abu.
+     */
+    private const CACHE_SECONDS = 660;
+
     public function __construct(
         private readonly Go2rtcClient $go2rtc,
         private readonly int $failureThreshold,
@@ -46,12 +56,31 @@ class StreamHealthProbe
     {
         $camera->stream_probed_at = now();
 
-        $frame = $this->go2rtc->frame($camera, $this->timeoutSeconds);
+        // ⚠️ `warmUp: true` — probe inilah yang boleh menunggu.
+        //
+        // Aliran go2rtc baru mengalir saat ada yang meminta, dan bingkai
+        // pertama sebelum keyframe tiba berupa bidang abu. Probe berjalan di
+        // latar tiap sepuluh menit, jadi ia mampu membayar enam detik
+        // pemanasan; permintaan warga tidak.
+        $frame = $this->go2rtc->frame($camera, $this->timeoutSeconds, warmUp: true);
 
         // `frame()` sudah mengembalikan null untuk badan kosong — go2rtc dapat
         // menjawab 200 dengan nol byte saat stream terdaftar tetapi kameranya
         // bisu. Itu justru kasus yang paling menipu, dan sudah tertangkap.
         if ($frame !== null && $frame !== '') {
+            // Bingkai yang sudah panas ini DISIMPAN ke cache yang sama dengan
+            // yang dibaca endpoint thumbnail.
+            //
+            // Tanpa ini, warga tetap menerima bingkai abu: permintaan pertama
+            // setelah cache kedaluwarsa datang saat aliran sudah dingin lagi,
+            // dan ia tidak boleh menunggu pemanasan. Probe yang mengisi cache
+            // membuat pemanasan dibayar di latar, bukan oleh warga.
+            Cache::put(
+                "cctv:thumb:{$camera->slug}",
+                base64_encode($frame),
+                now()->addSeconds(self::CACHE_SECONDS),
+            );
+
             $camera->stream_status = 'online';
             $camera->stream_failure_count = 0;
             $camera->stream_error = null;

@@ -153,11 +153,23 @@ class CitizenCameraController extends Controller
      * menunggu keyframe. Perangkat itu tidak dibuat untuk dipanggil selusin
      * kali per detik oleh setiap warga yang membuka aplikasi.
      *
-     * Tiga puluh detik: cukup lama untuk menahan gelombang permintaan, cukup
-     * pendek supaya gambarnya tidak menyesatkan. CCTV yang basi lima menit
-     * memberi tahu warga tentang keadaan yang sudah lewat.
+     * ⚠️ **Diselaraskan dengan selang probe (10 menit), bukan dibuat pendek.**
+     *
+     * Semula tiga puluh detik, dengan alasan "gambar CCTV tidak boleh basi".
+     * Alasan itu benar, tetapi akibatnya justru lebih buruk: aliran go2rtc
+     * baru mengalir saat ada yang meminta, dan permintaan pertama setelah
+     * cache habis datang ketika aliran sudah dingin — yang dikembalikan
+     * adalah bidang ABU. Warga melihat gambar abu selama sembilan setengah
+     * menit dari setiap sepuluh.
+     *
+     * Yang mengisi cache sekarang adalah probe terjadwal, yang mampu
+     * menunggu pemanasan enam detik di latar. Umur cache dibuat sedikit lebih
+     * panjang daripada selang probe supaya tidak ada celah di antaranya.
+     *
+     * Gambar berumur sepuluh menit yang JELAS lebih berguna daripada gambar
+     * berumur tiga puluh detik yang abu.
      */
-    private const THUMBNAIL_TTL = 30;
+    private const THUMBNAIL_TTL = 660;
 
     /**
      * GET /api/v1/citizen/cctv/cameras/{slug}/thumbnail
@@ -251,7 +263,12 @@ class CitizenCameraController extends Controller
             'Content-Type' => 'image/jpeg',
 
             // Aplikasi pun tidak perlu meminta ulang dalam rentang ini.
-            'Cache-Control' => 'public, max-age='.self::THUMBNAIL_TTL,
+            // Cache-Control SENGAJA lebih pendek daripada TTL server: aplikasi
+            // boleh meminta ulang tiap menit, dan permintaan itu murah karena
+            // dijawab dari cache server. Menyamakannya dengan TTL server
+            // membuat gambar tertahan di perangkat meski server sudah punya
+            // yang baru.
+            'Cache-Control' => 'public, max-age=60',
         ]);
     }
 }
