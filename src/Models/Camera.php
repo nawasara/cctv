@@ -34,6 +34,10 @@ class Camera extends Model
         'channel',
         'subtype',
         'video_codec',
+        'stream_status',
+        'stream_failure_count',
+        'stream_probed_at',
+        'stream_error',
         'username',
         'password',
         'is_active',
@@ -52,6 +56,7 @@ class Camera extends Model
         'is_active' => 'boolean',
         'is_public' => 'boolean',
         'sync_title' => 'boolean',
+        'stream_probed_at' => 'datetime',
         'recording_enabled' => 'boolean',
         'channel' => 'integer',
         'subtype' => 'integer',
@@ -63,6 +68,36 @@ class Camera extends Model
         'last_seen_at' => 'datetime',
         'last_probed_at' => 'datetime',
     ];
+
+    /**
+     * Status yang DITAMPILKAN KE WARGA.
+     *
+     * ⚠️ Memakai `stream_status`, BUKAN `health_status`.
+     *
+     * `health_status` menjawab "kamera hidup menurut TCP". `stream_status`
+     * menjawab "kalau warga menekan tonton, apakah muncul gambar" — dan itu
+     * pertanyaan yang sesungguhnya mereka ajukan.
+     *
+     * Keduanya dapat berbeda: kamera menjawab TCP dengan sempurna sementara
+     * siarannya tidak dapat ditonton (kredensial berubah, stream belum
+     * terdaftar di go2rtc, codec HEVC). Menampilkan `health_status` berarti
+     * menjanjikan sesuatu yang belum tentu ada — warga menekan tonton dan
+     * mendapat layar hitam.
+     *
+     * Selama `stream_status` masih `unknown` — probe pertama belum berjalan —
+     * status kamera dipakai sebagai cadangan. Itu lebih baik daripada
+     * menampilkan `unknown` untuk seluruh kamera setelah rilis, sampai
+     * penjadwal berjalan.
+     */
+    public function getPublicStatusAttribute(): string
+    {
+        if (in_array($this->stream_status, ['online', 'offline'], true)) {
+            return $this->stream_status;
+        }
+
+        return $this->health_status ?: 'unknown';
+    }
+
 
     // Kredensial sengaja disembunyikan dari array/JSON serialization supaya
     // tidak bocor lewat ->toArray() di response Livewire atau API.

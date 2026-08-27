@@ -39,17 +39,23 @@ class CitizenCameraResource extends JsonResource
             'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
             'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
 
-            // 'unknown' bila probe belum pernah berjalan. Aplikasi menampilkan
-            // lencana status, dan nilai tak dikenal harus jatuh ke tampilan
-            // netral — bukan dianggap mati.
-            'status' => $this->health_status ?: 'unknown',
+            // ⚠️ `publicStatus`, BUKAN `health_status`.
+            //
+            // `health_status` hanya menjawab "kamera menjawab TCP". Yang
+            // ditanyakan warga adalah "kalau saya tekan tonton, muncul
+            // gambar?" — dan itu dijawab probe siaran lewat go2rtc.
+            // Lihat Camera::getPublicStatusAttribute().
+            //
+            // 'unknown' bila belum pernah diprobe sama sekali. Aplikasi
+            // menggambarnya netral, bukan sebagai mati.
+            'status' => $this->publicStatus,
 
             // Sebab kamera tidak aktif, ditulis petugas untuk dibaca warga.
             //
             // Hanya dikirim saat kameranya memang tidak hidup: catatan lama
             // yang tertinggal pada kamera yang sudah pulih akan memberi tahu
             // warga tentang kerusakan yang sudah tidak ada.
-            'offline_note' => $this->health_status === 'online'
+            'offline_note' => $this->publicStatus === 'online'
                 ? null
                 : ($this->offline_note ?: null),
 
@@ -61,7 +67,7 @@ class CitizenCameraResource extends JsonResource
             // Dikirim di DAFTAR, bukan hanya sebagai endpoint terpisah:
             // aplikasi menggambar kisi thumbnail dan tidak perlu menyusun
             // alamatnya sendiri — host-nya dapat berbeda dari host API.
-            'thumbnail_url' => $this->health_status === 'online'
+            'thumbnail_url' => $this->publicStatus === 'online'
                 ? url("/api/v1/citizen/cctv/cameras/{$this->slug}/thumbnail")
                 : null,
         ];

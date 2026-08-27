@@ -9,9 +9,11 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Nawasara\Cctv\Console\Commands\ProbeCamerasCommand;
+use Nawasara\Cctv\Console\Commands\ProbeStreamsCommand;
 use Nawasara\Cctv\Console\Commands\SyncGo2rtcCommand;
 use Nawasara\Cctv\Console\Commands\SyncTitlesCommand;
 use Nawasara\Cctv\Services\CameraHealthProbe;
+use Nawasara\Cctv\Services\StreamHealthProbe;
 use Nawasara\Cctv\Services\DahuaClient;
 use Nawasara\Cctv\Services\Go2rtcClient;
 use Symfony\Component\Finder\Finder;
@@ -32,6 +34,12 @@ class CctvServiceProvider extends ServiceProvider
             (int) config('nawasara-cctv.health.failure_threshold'),
         ));
 
+        $this->app->singleton(StreamHealthProbe::class, fn ($app) => new StreamHealthProbe(
+            $app->make(Go2rtcClient::class),
+            (int) config('nawasara-cctv.stream_health.failure_threshold', 2),
+            (int) config('nawasara-cctv.stream_health.probe_timeout', 10),
+        ));
+
         $this->app->singleton(DahuaClient::class, fn () => new DahuaClient(
             (int) config('nawasara-cctv.dahua.http_timeout', 12),
         ));
@@ -43,6 +51,7 @@ class CctvServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 ProbeCamerasCommand::class,
+                ProbeStreamsCommand::class,
                 SyncGo2rtcCommand::class,
                 SyncTitlesCommand::class,
             ]);
@@ -74,6 +83,18 @@ class CctvServiceProvider extends ServiceProvider
             $schedule->command('cctv:probe')
                 ->everyFiveMinutes()
                 ->withoutOverlapping(4)
+                ->runInBackground();
+
+            // Probe SIARAN tiap 10 menit — lebih jarang daripada probe TCP
+            // karena tiap panggilan menarik bingkai sungguhan dari kamera,
+            // dan sebelas kamera sekaligus membebani go2rtc.
+            //
+            // Inilah yang menentukan lencana yang dilihat warga. Probe TCP
+            // di atas tetap jalan sebagai bahan diagnosis petugas: bedanya
+            // dengan probe ini menunjuk DI MANA rantainya putus.
+            $schedule->command('cctv:probe-streams')
+                ->everyTenMinutes()
+                ->withoutOverlapping(9)
                 ->runInBackground();
 
             // Sinkronisasi go2rtc tiap jam — jaring pengaman kalau sidecar

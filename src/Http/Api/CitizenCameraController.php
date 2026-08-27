@@ -173,7 +173,10 @@ class CitizenCameraController extends Controller
     {
         $camera = $this->publicCameras()->where('slug', $slug)->firstOrFail();
 
-        if ($camera->health_status !== 'online') {
+        // Status yang SAMA dengan yang dilihat warga — bukan health_status.
+        // Kamera yang TCP-nya hidup tetapi siarannya mati tidak punya bingkai
+        // untuk diberikan, dan menunggu timeout-nya hanya menahan permintaan.
+        if ($camera->publicStatus !== 'online') {
             return response('', 404);
         }
 

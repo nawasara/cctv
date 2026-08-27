@@ -60,12 +60,34 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-sm">
+                                {{-- Lencana kamera — hasil probe TCP. Untuk
+                                     petugas ini yang benar: mereka perlu tahu
+                                     kondisi perangkatnya. --}}
                                 @if ($camera->health_status === 'online')
                                     <x-nawasara-ui::badge color="success" icon="lucide-circle-check">online</x-nawasara-ui::badge>
                                 @elseif ($camera->health_status === 'offline')
                                     <x-nawasara-ui::badge color="danger" icon="lucide-circle-x">offline</x-nawasara-ui::badge>
                                 @else
                                     <x-nawasara-ui::badge color="neutral">belum diprobe</x-nawasara-ui::badge>
+                                @endif
+
+                                {{-- ⚠️ Kamera hidup tetapi SIARANNYA mati.
+                                     Inilah yang selama ini tampil "Aktif" di
+                                     aplikasi warga lalu menghasilkan layar
+                                     hitam. Ditandai TEGAS supaya petugas tahu
+                                     ada yang perlu diperbaiki, meski
+                                     kameranya sendiri terlihat sehat. --}}
+                                @if ($camera->health_status === 'online' && $camera->stream_status === 'offline')
+                                    <div class="mt-1">
+                                        <x-nawasara-ui::badge color="warning" icon="lucide-video-off">
+                                            siaran mati
+                                        </x-nawasara-ui::badge>
+                                        @if ($camera->stream_error)
+                                            <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                                {{ $camera->stream_error }}
+                                            </p>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
                             <td class="px-6 py-4">

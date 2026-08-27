@@ -94,6 +94,29 @@ return [
     ],
 
     // -------------------------------------------------------------------------
+    // Probe SIARAN — berbeda dari probe kamera di atas
+    // -------------------------------------------------------------------------
+    //
+    // Probe di atas melakukan TCP connect ke kamera; yang ini meminta satu
+    // bingkai lewat go2rtc — jalur yang SAMA dengan yang ditempuh warga.
+    //
+    // Keduanya dapat berbeda, dan setiap perbedaan itu janji palsu di layar:
+    // kamera menjawab TCP dengan sempurna sementara siarannya tidak dapat
+    // ditonton (kredensial berubah, stream belum terdaftar, codec HEVC).
+    // Yang ditampilkan ke warga adalah hasil probe INI.
+    //
+    'stream_health' => [
+        // Lebih lama daripada TCP connect: go2rtc perlu menarik bingkai dari
+        // kamera, dan pada sinyal buruk itu memakan beberapa detik.
+        'probe_timeout' => env('CCTV_STREAM_PROBE_TIMEOUT', 10),
+
+        // Ambang berturut. Satu kegagalan dapat berarti go2rtc sedang sibuk,
+        // bukan siarannya mati — lencana yang berkedip membuat warga berhenti
+        // mempercayainya.
+        'failure_threshold' => env('CCTV_STREAM_FAILURE_THRESHOLD', 2),
+    ],
+
+    // -------------------------------------------------------------------------
     // Recording (tahap berikutnya — struktur DB sudah ada, engine belum)
     // -------------------------------------------------------------------------
     // Recording butuh keputusan retention + storage tersendiri. Config ini
