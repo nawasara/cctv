@@ -26,3 +26,9 @@ Route::get('/cameras/{slug}', [CitizenCameraController::class, 'show'])
 
 Route::get('/cameras/{slug}/stream', [CitizenCameraController::class, 'stream'])
     ->name('cameras.stream');
+
+// Menjawab JPEG, bukan JSON. Hasilnya di-cache 30 detik — lihat catatan pada
+// CitizenCameraController::thumbnail(): yang dilindungi cache itu perangkat
+// Dahua-nya, bukan server.
+Route::get('/cameras/{slug}/thumbnail', [CitizenCameraController::class, 'thumbnail'])
+    ->name('cameras.thumbnail');

@@ -160,4 +160,49 @@ class Go2rtcClient
             return false;
         }
     }
+
+    /**
+     * Tangkap satu bingkai sebagai JPEG. Null bila gagal.
+     *
+     * Dipakai thumbnail layar CCTV aplikasi warga. Tangkapan ini MAHAL bagi
+     * kamera: go2rtc harus membuka koneksi RTSP ke perangkat Dahua, menunggu
+     * keyframe, lalu men-decode-nya. Karena itu pemanggil WAJIB men-cache
+     * hasilnya — lihat `CitizenCameraController::thumbnail()`.
+     *
+     * ⚠️ **Batas waktunya sendiri, lebih longgar dari panggilan API biasa.**
+     * `/api/streams` menjawab dari memori dalam milidetik; menangkap bingkai
+     * menunggu keyframe dari kamera, yang pada Dahua bergantung pada interval
+     * GOP-nya — dua sampai empat detik bukan hal aneh. Memakai batas waktu
+     * yang sama membuat tangkapan gagal justru pada kamera yang sehat.
+     */
+    public function frame(Camera $camera, int $timeoutSeconds = 10): ?string
+    {
+        try {
+            $response = Http::baseUrl(rtrim($this->apiUrl, '/'))
+                ->timeout($timeoutSeconds)
+                ->withQueryParameters(['src' => $camera->slug])
+                ->get('/api/frame.jpeg');
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $body = $response->body();
+
+            // go2rtc dapat menjawab 200 dengan badan kosong bila stream-nya
+            // terdaftar tetapi kameranya tidak menjawab. Menyimpan itu ke
+            // cache berarti warga melihat gambar rusak selama 30 detik
+            // berikutnya.
+            return $body === '' ? null : $body;
+        } catch (\Throwable $e) {
+            // Hanya slug yang dicatat — jangan pernah menuliskan URL sumber,
+            // ia memuat kredensial RTSP (lihat catatan kelas).
+            Log::warning('go2rtc frame capture error', [
+                'slug' => $camera->slug,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
 }

@@ -39,6 +39,7 @@ class Camera extends Model
         'is_active',
         'is_public',
         'health_status',
+        'offline_note',
         'failure_count',
         'last_seen_at',
         'last_probed_at',
@@ -94,6 +95,10 @@ class Camera extends Model
                 // saja, bukan sekadar setelan operasional.
                 'is_public',
                 'recording_enabled',
+                // Teks yang DIBACA WARGA. Perubahannya dicatat karena itu
+                // pernyataan resmi kepada publik tentang keadaan kamera,
+                // bukan catatan internal.
+                'offline_note',
             ])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();

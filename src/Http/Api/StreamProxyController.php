@@ -30,9 +30,28 @@ class StreamProxyController extends Controller
         $sig = (string) $request->query('sig', '');
         $exp = (int) $request->query('exp', 0);
 
+        // ⚠️ `mode` IKUT DIPERIKSA, dan harus sama persis dengan yang
+        // ditandatangani `CitizenCameraController::stream()`.
+        //
+        // Nilai inilah yang dipakai nginx memilih endpoint go2rtc lewat
+        // `$arg_mode`. Bila tidak ikut dalam HMAC, URL sah untuk mp4 dapat
+        // diubah tangannya menjadi mode apa pun dan tetap lolos — lalu nginx
+        // meneruskannya ke jalur go2rtc yang tidak pernah dimaksudkan,
+        // termasuk `/api/streams` yang memuat kredensial RTSP kamera.
+        //
+        // URL lama (sebelum 27 Agustus 2026) tidak membawa `mode` dan
+        // ditandatangani tanpa itu. Keduanya diterima: string kosong
+        // menghasilkan payload yang sama dengan tanda tangan lama, sehingga
+        // tontonan Gasta yang sedang berjalan tidak terputus saat dirilis.
+        $mode = (string) $request->query('mode', '');
+
+        $payload = $mode === ''
+            ? ['slug' => $slug]
+            : ['slug' => $slug, 'mode' => $mode];
+
         $valid = $sig !== ''
             && $exp > 0
-            && $signer->verify(['slug' => $slug], $sig, $exp);
+            && $signer->verify($payload, $sig, $exp);
 
         // Validasi: kamera memang exist + aktif. Sig valid tapi kamera
         // sudah dihapus → tetap reject, jangan biarkan Nginx proxy.
