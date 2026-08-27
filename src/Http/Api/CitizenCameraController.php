@@ -180,11 +180,39 @@ class CitizenCameraController extends Controller
             return response('', 404);
         }
 
-        $jpeg = Cache::remember(
+        // ⚠️ **Di-encode base64 sebelum masuk cache, dan itu WAJIB.**
+        //
+        // `CACHE_STORE=database` menyimpan nilai cache sebagai teks di MySQL.
+        // JPEG adalah data biner yang memuat byte di luar UTF-8 yang sah;
+        // menyimpannya apa adanya membuat MySQL menolak dengan
+        // "Incorrect string value", dan permintaannya berakhir 500 — bukan
+        // gambar rusak, melainkan galat server.
+        //
+        // Ditemukan 27 Agustus 2026: seluruh kamera `online` menjawab 500,
+        // sementara yang bukan online menjawab 404 dengan benar (jalur itu
+        // tidak pernah menyentuh cache).
+        //
+        // Base64 membesarkan ukurannya sekitar sepertiga. Itu harga yang
+        // pantas untuk cache yang bekerja pada driver mana pun — dan bila
+        // kelak driver-nya pindah ke Redis atau berkas, kode ini tetap benar.
+        $encoded = Cache::remember(
             "cctv:thumb:{$camera->slug}",
             self::THUMBNAIL_TTL,
-            fn () => $go2rtc->frame($camera),
+            function () use ($go2rtc, $camera) {
+                $raw = $go2rtc->frame($camera);
+
+                return $raw === null ? null : base64_encode($raw);
+            },
         );
+
+        $jpeg = $encoded === null ? null : base64_decode($encoded, true);
+
+        // `base64_decode` dengan mode ketat mengembalikan false bila isinya
+        // rusak — nilai cache lama dari sebelum perbaikan ini, misalnya.
+        if ($jpeg === false) {
+            Cache::forget("cctv:thumb:{$camera->slug}");
+            $jpeg = null;
+        }
 
         // Tangkapan gagal — kamera sedang tidak menjawab meski statusnya
         // online, atau go2rtc belum sempat menyiapkan stream-nya.
