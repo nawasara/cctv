@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Nawasara\Api\Services\StreamUrlSigner;
 use Nawasara\Cctv\Http\Resources\CitizenCameraResource;
 use Nawasara\Cctv\Models\Camera;
@@ -195,22 +196,43 @@ class CitizenCameraController extends Controller
         // Base64 membesarkan ukurannya sekitar sepertiga. Itu harga yang
         // pantas untuk cache yang bekerja pada driver mana pun — dan bila
         // kelak driver-nya pindah ke Redis atau berkas, kode ini tetap benar.
-        $encoded = Cache::remember(
-            "cctv:thumb:{$camera->slug}",
-            self::THUMBNAIL_TTL,
-            function () use ($go2rtc, $camera) {
-                $raw = $go2rtc->frame($camera);
+        // ⚠️ **Seluruh jalur pengambilan dibungkus, dan itu disengaja.**
+        //
+        // Endpoint ini menyajikan GAMBAR HIASAN. Apa pun yang gagal di
+        // dalamnya — cache menolak nilainya, go2rtc tidak menjawab, kameranya
+        // membisu — tidak boleh berakhir sebagai 500. Aplikasi sudah tahu
+        // menggambar ikon cadangan untuk 404; yang tidak dapat ditanganinya
+        // dengan anggun adalah galat server.
+        //
+        // Sebelum ini, kegagalan apa pun jatuh sebagai 500 dan penyebabnya
+        // tidak terlihat sama sekali dari luar. Sekarang dicatat ke log dengan
+        // sebabnya, dan warga tetap mendapat 404 yang bersih.
+        try {
+            $encoded = Cache::remember(
+                "cctv:thumb:{$camera->slug}",
+                self::THUMBNAIL_TTL,
+                function () use ($go2rtc, $camera) {
+                    $raw = $go2rtc->frame($camera);
 
-                return $raw === null ? null : base64_encode($raw);
-            },
-        );
+                    return $raw === null ? null : base64_encode($raw);
+                },
+            );
 
-        $jpeg = $encoded === null ? null : base64_decode($encoded, true);
+            $jpeg = $encoded === null ? null : base64_decode($encoded, true);
 
-        // `base64_decode` dengan mode ketat mengembalikan false bila isinya
-        // rusak — nilai cache lama dari sebelum perbaikan ini, misalnya.
-        if ($jpeg === false) {
-            Cache::forget("cctv:thumb:{$camera->slug}");
+            // `base64_decode` mode ketat mengembalikan false bila isinya rusak
+            // — nilai cache lama dari sebelum base64 dipakai, misalnya.
+            if ($jpeg === false) {
+                Cache::forget("cctv:thumb:{$camera->slug}");
+                $jpeg = null;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('cctv thumbnail gagal', [
+                'slug' => $camera->slug,
+                'error' => $e->getMessage(),
+                'kelas' => $e::class,
+            ]);
+
             $jpeg = null;
         }
 
