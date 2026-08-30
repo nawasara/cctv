@@ -46,7 +46,7 @@ class CitizenCameraController extends Controller
     /**
      * GET /api/v1/citizen/cctv/cameras
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, Go2rtcClient $go2rtc): JsonResponse
     {
         $query = $this->publicCameras()->orderBy('name');
 
@@ -62,21 +62,69 @@ class CitizenCameraController extends Controller
 
         $cameras = $query->get();
 
+        // Jumlah penonton diambil SEKALI untuk seluruh daftar, bukan per
+        // kamera: memanggil go2rtc sebelas kali tiap layar dibuka membebani
+        // sidecar yang tugas utamanya menyalurkan video.
+        $viewers = $this->viewerCounts($go2rtc);
+
         return response()->json([
-            'data' => CitizenCameraResource::collection($cameras)->resolve(),
-            'meta' => ['total' => $cameras->count()],
+            'data' => CitizenCameraResource::collection($cameras)
+                ->additional(['viewers' => $viewers])
+                ->resolve(),
+            'meta' => [
+                'total' => $cameras->count(),
+
+                // Total penonton seluruh kamera — dipakai layar untuk
+                // menyebut "342 orang sedang menonton" tanpa menjumlah
+                // sendiri dari daftar yang mungkin terpaginasi kelak.
+                'viewers_total' => array_sum($viewers),
+            ],
         ]);
+    }
+
+    /**
+     * Jumlah penonton per kamera, di-cache sebentar.
+     *
+     * ⚠️ Cache-nya SANGAT PENDEK — sepuluh detik.
+     *
+     * Angka penonton adalah keadaan sesaat: menampilkan yang berumur satu
+     * menit membuat lencana terasa macet, dan warga yang melihat "0 menonton"
+     * padahal siarannya ramai berhenti mempercayainya. Sepuluh detik cukup
+     * menahan gelombang permintaan saat banyak warga membuka layar bersamaan,
+     * tanpa membuat angkanya terasa beku.
+     *
+     * Kegagalan menghubungi go2rtc mengembalikan peta KOSONG, bukan galat:
+     * daftar kamera tetap berguna tanpa angka penonton, dan menjatuhkan
+     * seluruh layar karena lencana hiasan adalah kekeliruan yang tidak
+     * sepadan.
+     *
+     * @return array<string,int>
+     */
+    protected function viewerCounts(Go2rtcClient $go2rtc): array
+    {
+        return Cache::remember(
+            'cctv:viewers',
+            self::VIEWERS_TTL,
+            fn () => $go2rtc->viewerCounts(),
+        );
     }
 
     /**
      * GET /api/v1/citizen/cctv/cameras/{slug}
      */
-    public function show(string $slug): JsonResponse
+    public function show(string $slug, Go2rtcClient $go2rtc): JsonResponse
     {
         $camera = $this->publicCameras()->where('slug', $slug)->firstOrFail();
 
+        // Layar detail justru tempat angka ini paling berarti — di situlah
+        // warga sedang menonton, dan "342 orang menonton" membuat siaran
+        // terasa hidup.
+        $viewers = $this->viewerCounts($go2rtc);
+
         return response()->json([
-            'data' => (new CitizenCameraResource($camera))->resolve(request()),
+            'data' => (new CitizenCameraResource($camera))
+                ->additional(['viewers' => $viewers])
+                ->resolve(request()),
         ]);
     }
 
@@ -170,6 +218,15 @@ class CitizenCameraController extends Controller
      * berumur tiga puluh detik yang abu.
      */
     private const THUMBNAIL_TTL = 660;
+
+    /**
+     * Umur cache jumlah penonton (detik).
+     *
+     * Jauh lebih pendek daripada thumbnail: gambar boleh berumur sepuluh
+     * menit, tetapi angka penonton yang basi satu menit membuat lencananya
+     * terlihat macet.
+     */
+    private const VIEWERS_TTL = 10;
 
     /**
      * GET /api/v1/citizen/cctv/cameras/{slug}/thumbnail

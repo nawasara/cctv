@@ -23,6 +23,25 @@ use Nawasara\Cctv\Models\Camera;
  */
 class CitizenCameraResource extends JsonResource
 {
+    /**
+     * Angka penonton dari `additional(['viewers' => ...])`.
+     *
+     * Null bila tidak tersedia — pada `show()` yang hanya satu kamera, atau
+     * saat go2rtc tidak terjangkau. Aplikasi menuliskannya nullable.
+     */
+    protected function viewerCount(Request $request): ?int
+    {
+        $peta = $this->additional['viewers'] ?? null;
+
+        if (! is_array($peta)) {
+            return null;
+        }
+
+        return array_key_exists($this->slug, $peta)
+            ? (int) $peta[$this->slug]
+            : null;
+    }
+
     public function toArray(Request $request): array
     {
         return [
@@ -67,6 +86,21 @@ class CitizenCameraResource extends JsonResource
             // Dikirim di DAFTAR, bukan hanya sebagai endpoint terpisah:
             // aplikasi menggambar kisi thumbnail dan tidak perlu menyusun
             // alamatnya sendiri — host-nya dapat berbeda dari host API.
+            // Jumlah penonton yang sedang menyaksikan siaran ini.
+            //
+            // Diambil dari `additional(['viewers' => ...])` yang dipasang
+            // controller — satu panggilan go2rtc untuk seluruh daftar, bukan
+            // satu per kamera.
+            //
+            // ⚠️ Null bila go2rtc tidak dapat dihubungi, BUKAN nol. Nol
+            // berarti "tidak ada yang menonton"; null berarti "tidak
+            // diketahui", dan aplikasi menyembunyikan lencananya alih-alih
+            // menyatakan sepi yang belum tentu benar.
+            //
+            // Yang dihitung adalah SAMBUNGAN, bukan orang — satu warga dengan
+            // dua tab terhitung dua. Untuk lencana "sedang ramai" itu cukup.
+            'viewers' => $this->viewerCount($request),
+
             'thumbnail_url' => $this->publicStatus === 'online'
                 ? url("/api/v1/citizen/cctv/cameras/{$this->slug}/thumbnail")
                 : null,

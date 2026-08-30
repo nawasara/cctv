@@ -150,6 +150,44 @@ class Go2rtcClient
     }
 
     /**
+     * Jumlah penonton yang sedang aktif, per slug kamera.
+     *
+     * go2rtc mencatat tiap sambungan keluar sebagai `consumers` pada
+     * stream-nya. Yang dihitung di sini adalah **sambungan**, bukan orang:
+     * satu warga yang membuka dua tab terhitung dua, dan sambungan yang baru
+     * saja putus masih tercatat beberapa detik sampai go2rtc menyadarinya.
+     *
+     * ⚠️ **Angka ini juga memuat penonton non-warga** — Gasta, halaman Live
+     * di panel Nawasara, dan probe kesehatan yang sedang menahan aliran.
+     * Untuk lencana "sedang ditonton" itu justru benar: warga bertanya
+     * "ramai atau tidak", bukan "berapa pemakai aplikasi".
+     *
+     * Dikembalikan sebagai peta agar pemanggil cukup satu permintaan untuk
+     * seluruh kamera — memanggil per kamera berarti sebelas permintaan tiap
+     * kali daftar dibuka.
+     *
+     * @return array<string,int>  slug => jumlah penonton
+     */
+    public function viewerCounts(): array
+    {
+        $out = [];
+
+        foreach ($this->streams() as $slug => $stream) {
+            if (! is_array($stream)) {
+                continue;
+            }
+
+            $consumers = $stream['consumers'] ?? [];
+
+            // `consumers` boleh null saat stream terdaftar tetapi belum pernah
+            // dibuka — bukan array kosong, melainkan tidak ada sama sekali.
+            $out[(string) $slug] = is_array($consumers) ? count($consumers) : 0;
+        }
+
+        return $out;
+    }
+
+    /**
      * Apakah sidecar go2rtc reachable? Dipakai untuk badge status di UI.
      */
     public function isReachable(): bool
