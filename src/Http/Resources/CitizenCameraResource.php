@@ -115,9 +115,14 @@ class CitizenCameraResource extends JsonResource
             // alamatnya sendiri — host-nya dapat berbeda dari host API.
             // Jumlah penonton yang sedang menyaksikan siaran ini.
             //
-            // Diambil dari `additional(['viewers' => ...])` yang dipasang
-            // controller — satu panggilan go2rtc untuk seluruh daftar, bukan
-            // satu per kamera.
+            // Dipasang controller lewat `withViewers()` — satu panggilan
+            // go2rtc untuk seluruh daftar, bukan satu per kamera.
+            //
+            // ⚠️ JANGAN kembalikan ke `additional(['viewers' => ...])`.
+            // Laravel memasang `additional()` pada KOLEKSI dan tidak
+            // meneruskannya ke anggota, sehingga `viewers` selalu null
+            // sementara `meta.viewers_total` menyebut angka yang benar —
+            // terlihat persis seperti go2rtc tak terjangkau.
             //
             // ⚠️ Null bila go2rtc tidak dapat dihubungi, BUKAN nol. Nol
             // berarti "tidak ada yang menonton"; null berarti "tidak

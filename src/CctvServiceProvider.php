@@ -108,8 +108,13 @@ class CctvServiceProvider extends ServiceProvider
             // sekali sehari cukup (nama jarang berubah; operator rename
             // kamera di device itu kejadian langka). Hanya kamera dengan
             // sync_title aktif yang ter-update.
+            //
+            // ⚠️ `->timezone()` WAJIB: app.timezone bernilai UTC, jadi tanpa
+            // itu '03:00' berarti pukul 10:00 WIB — di tengah jam kerja,
+            // bukan dini hari seperti yang dimaksud.
             $schedule->command('cctv:sync-titles')
                 ->dailyAt('03:00')
+                ->timezone('Asia/Jakarta')
                 ->withoutOverlapping(30)
                 ->runInBackground();
         });
