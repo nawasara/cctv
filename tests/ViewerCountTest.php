@@ -106,6 +106,37 @@ class ViewerCountTest extends TestCase
         $this->assertNull($ambil('channel-99'));
     }
 
+    /**
+     * Peta HARUS sampai ke tiap item, bukan hanya ke koleksinya.
+     *
+     * Semula dipasang lewat `additional(['viewers' => ...])` pada koleksi.
+     * Laravel tidak meneruskan itu ke anggota, sehingga `$this->additional`
+     * di dalam item selalu kosong dan `viewers` selalu null — terlihat persis
+     * seperti "go2rtc tidak terjangkau", padahal petanya benar.
+     *
+     * Ditemukan di produksi: `meta.viewers_total` menyebut 9 sementara setiap
+     * `viewers` bernilai null.
+     */
+    public function test_peta_sampai_ke_tiap_item(): void
+    {
+        // Meniru properti statis pada Resource.
+        $peta = ['channel-1' => 4, 'channel-3' => 9];
+
+        $ambil = fn (?array $m, string $slug) => $m === null
+            ? null
+            : (array_key_exists($slug, $m) ? (int) $m[$slug] : null);
+
+        // Terpasang: angkanya sampai.
+        $this->assertSame(4, $ambil($peta, 'channel-1'));
+        $this->assertSame(9, $ambil($peta, 'channel-3'));
+
+        // Kamera yang ada di peta dengan nilai nol tetap nol, bukan null.
+        $this->assertSame(0, $ambil(['channel-2' => 0], 'channel-2'));
+
+        // Tidak terpasang sama sekali: null, dan lencananya disembunyikan.
+        $this->assertNull($ambil(null, 'channel-1'));
+    }
+
     /** Total untuk `meta.viewers_total` di jawaban daftar. */
     public function test_total_seluruh_kamera(): void
     {

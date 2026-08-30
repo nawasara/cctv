@@ -67,10 +67,23 @@ class CitizenCameraController extends Controller
         // sidecar yang tugas utamanya menyalurkan video.
         $viewers = $this->viewerCounts($go2rtc);
 
+        // Dipasang sebagai properti statis, BUKAN `additional()` — yang
+        // terakhir menempel pada koleksi dan tidak pernah sampai ke tiap
+        // anggotanya. Lihat catatan di CitizenCameraResource.
+        CitizenCameraResource::withViewers($viewers);
+
+        try {
+            $data = CitizenCameraResource::collection($cameras)->resolve();
+        } finally {
+            // Dibersihkan apa pun yang terjadi: properti statis bertahan
+            // melintasi permintaan pada pekerja yang berumur panjang (Octane),
+            // dan angka penonton milik permintaan sebelumnya adalah kebohongan
+            // yang sulit dilacak.
+            CitizenCameraResource::withViewers(null);
+        }
+
         return response()->json([
-            'data' => CitizenCameraResource::collection($cameras)
-                ->additional(['viewers' => $viewers])
-                ->resolve(),
+            'data' => $data,
             'meta' => [
                 'total' => $cameras->count(),
 
@@ -121,10 +134,16 @@ class CitizenCameraController extends Controller
         // terasa hidup.
         $viewers = $this->viewerCounts($go2rtc);
 
+        CitizenCameraResource::withViewers($viewers);
+
+        try {
+            $data = (new CitizenCameraResource($camera))->resolve(request());
+        } finally {
+            CitizenCameraResource::withViewers(null);
+        }
+
         return response()->json([
-            'data' => (new CitizenCameraResource($camera))
-                ->additional(['viewers' => $viewers])
-                ->resolve(request()),
+            'data' => $data,
         ]);
     }
 

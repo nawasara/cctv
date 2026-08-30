@@ -24,21 +24,48 @@ use Nawasara\Cctv\Models\Camera;
 class CitizenCameraResource extends JsonResource
 {
     /**
-     * Angka penonton dari `additional(['viewers' => ...])`.
+     * Peta jumlah penonton, dipasang controller sebelum me-resolve.
      *
-     * Null bila tidak tersedia — pada `show()` yang hanya satu kamera, atau
-     * saat go2rtc tidak terjangkau. Aplikasi menuliskannya nullable.
+     * ⚠️ **Properti statis, bukan `additional()`.**
+     *
+     * `additional()` menempel pada KOLEKSI, dan Laravel tidak meneruskannya
+     * ke tiap anggota — `$this->additional` di dalam item selalu kosong.
+     * Akibatnya `viewers` selalu null meski petanya benar, dan itu terlihat
+     * persis seperti "go2rtc tidak terjangkau".
+     *
+     * Ditemukan di produksi 30 Agustus 2026: `meta.viewers_total` menyebut 9
+     * sementara setiap `viewers` bernilai null.
+     *
+     * @var array<string,int>|null
+     */
+    protected static ?array $viewerMap = null;
+
+    /**
+     * Dipanggil controller sekali, sebelum me-resolve koleksi.
+     *
+     * @param  array<string,int>|null  $map
+     */
+    public static function withViewers(?array $map): void
+    {
+        static::$viewerMap = $map;
+    }
+
+    /**
+     * Angka penonton kamera ini.
+     *
+     * Null bila petanya tidak dipasang (mis. dipakai di tempat lain), atau
+     * kamera tidak ada di dalamnya — go2rtc tidak terjangkau, atau stream-nya
+     * belum terdaftar. Aplikasi menuliskannya nullable dan menyembunyikan
+     * lencananya; nol berarti sungguh tidak ada yang menonton.
      */
     protected function viewerCount(Request $request): ?int
     {
-        $peta = $this->additional['viewers'] ?? null;
-
-        if (! is_array($peta)) {
+        if (static::$viewerMap === null) {
             return null;
         }
 
-        return array_key_exists($this->slug, $peta)
-            ? (int) $peta[$this->slug]
+        return array_key_exists($this->slug, static::$viewerMap)
+            ? (int) static::$viewerMap[$this->slug]
             : null;
     }
 
