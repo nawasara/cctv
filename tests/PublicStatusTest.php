@@ -14,8 +14,12 @@ use PHPUnit\Framework\TestCase;
 class PublicStatusTest extends TestCase
 {
     /** Salinan logika Camera::getPublicStatusAttribute(). */
-    private function publicStatus(?string $stream, ?string $health): string
+    private function publicStatus(?string $stream, ?string $health, bool $aktif = true): string
     {
+        if (! $aktif) {
+            return 'offline';
+        }
+
         if (in_array($stream, ['online', 'offline'], true)) {
             return $stream;
         }
@@ -81,5 +85,33 @@ class PublicStatusTest extends TestCase
     {
         $this->assertSame('online', $this->publicStatus('degraded', 'online'));
         $this->assertSame('unknown', $this->publicStatus('degraded', null));
+    }
+
+    /**
+     * Kamera NONAKTIF selalu ditampilkan mati.
+     *
+     * ⚠️ `cctv:probe-streams` hanya memeriksa kamera aktif, sehingga kamera
+     * nonaktif selamanya ber-`stream_status = unknown` dan jatuh ke cadangan
+     * TCP-probe. TCP-probe selalu `online`, karena seluruh kamera berbagi satu
+     * NVR — begitu NVR-nya hidup, port setiap channel menjawab.
+     *
+     * Akibatnya slot kosong pun berlencana hijau. Terbukti 10 September 2026
+     * pada channel 12, yang kameranya sudah dilepas tetapi namanya tertinggal
+     * di NVR: `health_status = online`, `stream_status = unknown`, dan warga
+     * melihatnya sebagai kamera yang siap ditonton.
+     */
+    public function test_kamera_nonaktif_selalu_mati_meski_tcp_menjawab(): void
+    {
+        $this->assertSame(
+            'offline',
+            $this->publicStatus('unknown', 'online', aktif: false),
+            'kamera nonaktif tidak boleh tampil Aktif hanya karena port NVR terbuka',
+        );
+
+        $this->assertSame(
+            'offline',
+            $this->publicStatus('online', 'online', aktif: false),
+            'menonaktifkan kamera harus mengalahkan hasil probe apa pun',
+        );
     }
 }

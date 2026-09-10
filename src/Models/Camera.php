@@ -88,9 +88,20 @@ class Camera extends Model
      * status kamera dipakai sebagai cadangan. Itu lebih baik daripada
      * menampilkan `unknown` untuk seluruh kamera setelah rilis, sampai
      * penjadwal berjalan.
+     *
+     * ⚠️ Cadangan itu TIDAK berlaku untuk kamera yang dinonaktifkan.
+     * `cctv:probe-streams` hanya memeriksa kamera aktif, sehingga kamera
+     * nonaktif selamanya ber-`stream_status = unknown` dan jatuh ke TCP-probe
+     * — yang selalu `online`, karena seluruh kamera berbagi satu NVR. Slot
+     * kosong pun akhirnya berlencana hijau. Terbukti 10 September 2026 pada
+     * channel 12, yang kameranya sudah dilepas.
      */
     public function getPublicStatusAttribute(): string
     {
+        if (! $this->is_active) {
+            return 'offline';
+        }
+
         if (in_array($this->stream_status, ['online', 'offline'], true)) {
             return $this->stream_status;
         }
