@@ -30,6 +30,23 @@ class CameraController extends Controller
     {
         $query = Camera::query()
             ->where('is_active', true)
+
+            // ⚠️ `is_public` WAJIB disaring di sini, bukan diserahkan ke klien.
+            //
+            // Endpoint ini melayani Gasta — peta yang dibuka siapa pun. Tanpa
+            // saringan ini, kamera yang sengaja TIDAK dipublikasikan tetap
+            // terkirim lengkap dengan koordinatnya, dan penyembunyian yang
+            // dilakukan admin lewat panel tidak berarti apa-apa.
+            //
+            // Terbukti 10 September 2026: kamera RESEPSIONIS — kamera dalam
+            // ruangan, ditandai non-publik sejak dibuat — tetap muncul di
+            // respons yang dibaca Gasta. `is_active` saja menjawab pertanyaan
+            // yang berbeda: "kamera ini dipakai", bukan "boleh dilihat warga".
+            //
+            // CitizenCameraController sudah menyaringnya sejak awal; endpoint
+            // inilah yang tertinggal.
+            ->where('is_public', true)
+
             ->orderBy('name');
 
         // Opsi: ?mappable=1 → hanya yang punya koordinat. Default tidak
@@ -54,6 +71,9 @@ class CameraController extends Controller
     {
         $camera = Camera::where('slug', $slug)
             ->where('is_active', true)
+            // Lihat catatan di index(): tanpa ini, siapa pun yang menebak
+            // slug-nya dapat membuka kamera yang sengaja tidak dipublikasikan.
+            ->where('is_public', true)
             ->firstOrFail();
 
         return response()->json([
@@ -75,6 +95,14 @@ class CameraController extends Controller
     {
         $camera = Camera::where('slug', $slug)
             ->where('is_active', true)
+
+            // ⚠️ Yang paling penting dari ketiganya: endpoint ini MENERBITKAN
+            // URL tontonan bertanda tangan. Tanpa saringan `is_public`, kamera
+            // yang sengaja disembunyikan tetap dapat ditonton oleh siapa pun
+            // yang tahu slug-nya — dan tanda tangannya sah, sehingga tidak ada
+            // lapisan lain yang akan menolaknya.
+            ->where('is_public', true)
+
             ->firstOrFail();
 
         $signed = $signer->sign(['slug' => $camera->slug]);
