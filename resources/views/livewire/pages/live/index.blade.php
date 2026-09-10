@@ -101,8 +101,16 @@
                                                 <span class="relative inline-flex size-2.5 rounded-full bg-green-500"></span>
                                             </span>
                                         @else
+                                            {{-- Titik merah SAJA tidak memberi tahu apa yang
+                                                 perlu diperbaiki. Petugas perlu membedakan
+                                                 "kamera mati" dari "kamera hidup tetapi
+                                                 siarannya rusak" — keduanya perbaikan yang
+                                                 berbeda, dan yang kedua tidak akan pernah
+                                                 pulih sendiri. --}}
                                             <span class="size-2.5 shrink-0 rounded-full bg-rose-500"
-                                                title="offline"></span>
+                                                title="{{ $camera->health_status === 'online'
+                                                    ? 'Kamera hidup, siarannya mati'.($camera->stream_error ? ' — '.$camera->stream_error : '')
+                                                    : 'Kamera tidak menjawab' }}"></span>
                                         @endif
                                     </button>
                                 </li>

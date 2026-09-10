@@ -219,9 +219,26 @@ class Camera extends Model
         return $rtsp;
     }
 
+    /**
+     * Siap ditonton? — BUKAN sekadar "perangkatnya menjawab".
+     *
+     * ⚠️ Dulu ini membaca `health_status`, yang hanya hasil probe TCP. Seluruh
+     * kamera berbagi satu NVR, sehingga begitu NVR-nya hidup SEMUA channel
+     * dilaporkan online — termasuk yang siarannya mati dan slot yang kameranya
+     * sudah dilepas.
+     *
+     * Akibatnya halaman CCTV Live menggambar titik hijau berkedip pada kamera
+     * yang, saat diklik, hanya menampilkan pesan galat ffmpeg. Terbukti
+     * 10 September 2026 pada D1 SIBERUT: `health_status = online`,
+     * `stream_status = offline`, 375 kali gagal berturut-turut.
+     *
+     * Untuk keadaan PERANGKAT — yang tetap dibutuhkan petugas saat memisahkan
+     * "kamera mati" dari "kamera hidup tetapi siarannya rusak" — baca
+     * `health_status` langsung.
+     */
     public function isOnline(): bool
     {
-        return $this->health_status === 'online';
+        return $this->public_status === 'online';
     }
 
     /**

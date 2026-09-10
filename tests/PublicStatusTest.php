@@ -114,4 +114,28 @@ class PublicStatusTest extends TestCase
             'menonaktifkan kamera harus mengalahkan hasil probe apa pun',
         );
     }
+
+    /**
+     * `isOnline()` harus mengikuti publicStatus, bukan health_status.
+     *
+     * ⚠️ Halaman CCTV Live memakai method ini untuk menggambar titik hijau
+     * berkedip. Selama ia membaca `health_status`, titik itu menyala pada
+     * kamera yang saat diklik hanya menampilkan galat ffmpeg — dan seluruh
+     * kamera berbagi satu NVR, jadi begitu NVR hidup semuanya tampak siap.
+     *
+     * Terbukti 10 September 2026 pada D1 SIBERUT: perangkat menjawab TCP,
+     * siarannya gagal 375 kali berturut-turut, titiknya tetap hijau.
+     */
+    public function test_isOnline_mengikuti_siaran_bukan_probe_tcp(): void
+    {
+        // Keadaan D1 SIBERUT yang sebenarnya.
+        $this->assertSame(
+            'offline',
+            $this->publicStatus('offline', 'online'),
+            'kamera dengan siaran mati tidak boleh dihitung online',
+        );
+
+        // Yang benar-benar dapat ditonton tetap online.
+        $this->assertSame('online', $this->publicStatus('online', 'online'));
+    }
 }
