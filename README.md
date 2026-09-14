@@ -1,15 +1,10 @@
 # nawasara/cctv
 
-Monitoring CCTV publik untuk framework superapp Nawasara. Mendukung kamera
-**Dahua** via RTSP, ditampilkan ke browser lewat sidecar **go2rtc**
-(RTSP → WebRTC/HLS), dengan health monitoring dan kerangka playback rekaman.
+Public CCTV monitoring for the Nawasara superapp framework. It supports **Dahua** cameras over RTSP, shown in the browser through the **go2rtc** sidecar (RTSP to WebRTC/HLS), with health monitoring and a framework for recording playback.
 
-## Kenapa butuh sidecar
+## Why a sidecar is needed
 
-Browser tidak bisa memutar RTSP secara langsung. `go2rtc` adalah service
-terpisah (container) yang menerima RTSP dari kamera dan mem-publish ulang
-sebagai WebRTC/HLS/MSE yang browser bisa konsumsi. Laravel **tidak pernah**
-menyentuh RTSP — ia hanya bicara ke HTTP API go2rtc.
+Browsers cannot play RTSP directly. `go2rtc` is a separate service (a container) that takes RTSP from the camera and republishes it as WebRTC/HLS/MSE, which the browser can consume. Laravel **never** touches RTSP; it only talks to the go2rtc HTTP API.
 
 ```
 Kamera Dahua  --RTSP-->  go2rtc (sidecar)  --WebRTC/HLS-->  Browser
@@ -20,96 +15,58 @@ Kamera Dahua  --RTSP-->  go2rtc (sidecar)  --WebRTC/HLS-->  Browser
 
 ## Status v0.2.6
 
-| Fitur | Status |
+| Feature | Status |
 |---|---|
-| Registry kamera + CRUD (kredensial terenkripsi) | ✅ siap |
-| Live view (grid + single focus) via go2rtc | ✅ siap |
-| Sinkronisasi stream ke go2rtc | ✅ siap |
-| Health monitoring kamera (TCP probe) | ✅ siap |
-| **Health monitoring siaran** (ambil bingkai lewat go2rtc) | ✅ siap — v0.2.1 |
-| Pratinjau / thumbnail per kamera | ✅ siap — v0.2.2–v0.2.4 |
-| Jumlah penonton langsung | ✅ siap — v0.2.5–v0.2.6 |
-| API warga (`/citizen/cctv/*`) | ✅ siap |
-| Tabel + UI playback rekaman | ✅ siap (UI) |
-| **Engine perekaman** (record RTSP ke disk) | ⏳ menyusul — butuh keputusan retention/storage |
+| Camera registry + CRUD (encrypted credentials) | ready |
+| Live view (grid + single focus) via go2rtc | ready |
+| Stream sync to go2rtc | ready |
+| Camera health monitoring (TCP probe) | ready |
+| **Stream health monitoring** (grab a frame through go2rtc) | ready, v0.2.1 |
+| Preview / thumbnail per camera | ready, v0.2.2 to v0.2.4 |
+| Live viewer count | ready, v0.2.5 to v0.2.6 |
+| Citizen API (`/citizen/cctv/*`) | ready |
+| Recording playback table + UI | ready (UI only) |
+| **Recording engine** (record RTSP to disk) | not built yet, needs a retention/storage decision |
 
-UI Recordings sudah lengkap; begitu engine perekaman diaktifkan di versi
-berikutnya, halaman itu langsung berfungsi tanpa perubahan.
+The Recordings UI is complete. Once the recording engine is enabled in a future version, that page works without changes.
 
-## Keputusan yang mudah dibatalkan tanpa tahu alasannya
+## Design notes
 
-### 1. Ada DUA probe kesehatan, dan yang ditampilkan ke warga bukan yang TCP
+### 1. There are two health probes, and the one shown to citizens is not the TCP one
 
-`CameraHealthProbe` melakukan TCP connect ke port RTSP; `StreamHealthProbe`
-menempuh jalur warga — meminta satu bingkai dari go2rtc. Menyatukannya
-terlihat seperti pembersihan yang wajar, dan justru itu yang mengembalikan
-bug aslinya.
+`CameraHealthProbe` does a TCP connect to the RTSP port. `StreamHealthProbe` takes the citizen's path and asks go2rtc for a single frame. Merging them looks like reasonable cleanup, and doing so brings the original bug back.
 
-Keduanya sungguh berbeda hasilnya. Kamera dapat menjawab TCP dengan sempurna
-sementara siarannya tidak dapat ditonton — kredensial berubah, stream belum
-terdaftar di go2rtc, atau codec HEVC yang tak dapat ditranskode. Sebelum
-v0.2.1, kamera semacam itu tampil **"Aktif"** kepada warga, yang menekannya
-lalu mendapat layar hitam. Probe siaran menemukan dua kamera yang persis
-begitu (channel-11 dan channel-12) pada hari ia dinyalakan.
+The two really do give different results. A camera can answer TCP perfectly while its stream is unwatchable: credentials changed, the stream not yet registered in go2rtc, or an HEVC codec that cannot be transcoded. Before v0.2.1, a camera like that showed as **"Aktif"** to citizens, who tapped it and got a black screen. The stream probe found two cameras in exactly that state (channel-11 and channel-12) on the day it was switched on.
 
-`Camera::getPublicStatusAttribute()` karenanya mendahulukan status siaran,
-dan jatuh ke status kamera hanya bila siaran belum pernah diprobe.
+`Camera::getPublicStatusAttribute()` therefore prefers the stream status and falls back to the camera status only when the stream has never been probed.
 
-### 2. Bingkai di bawah 20 KB dibuang — bukan batas yang dikarang
+### 2. Frames below 20 KB are discarded
 
-Aliran go2rtc baru mengalir saat ada yang meminta, dan bingkai pertama
-sebelum keyframe tiba berupa **bidang abu** — JPEG yang sah, dijawab 200,
-tidak dapat dibedakan kecuali dari ukurannya.
+A go2rtc stream only starts flowing when something requests it, and the first frame before the keyframe arrives is a **grey field**: a valid JPEG, answered with 200, indistinguishable except by its size.
 
-Terukur di produksi: bingkai abu 6,5–10,4 KB, bingkai berisi 42–70 KB.
-Ambang 20 KB berada di jurang antara keduanya, bukan menempel salah satu
-ujung — pemandangan malam yang gelap menghasilkan berkas kecil, dan ambang
-yang terlalu tinggi akan mencabut pratinjau kamera yang sehat.
+Measured in production: grey frames are 6.5 to 10.4 KB, real frames 42 to 70 KB. The 20 KB threshold sits in the gap between them, not against either edge. A dark night scene produces a small file, and a threshold set too high would strip previews from healthy cameras.
 
-Sebabnya juga kenapa **umur cache (660 detik) harus melebihi selang probe
-(600 detik)**. Kalau lebih pendek, ada celah tempat cache sudah kosong
-sementara probe berikutnya belum berjalan — dan permintaan warga yang jatuh
-di celah itu memicu penangkapan dingin, yang mengembalikan bidang abu.
-Memendekkan cache "supaya lebih segar" mengembalikan gambar abu.
+This is also why the **cache lifetime (660 s) must exceed the probe interval (600 s)**. If it is shorter, there is a window where the cache is already empty while the next probe has not run yet, and a citizen request that lands in that window triggers a cold capture, which returns the grey field. Shortening the cache "to keep it fresher" brings the grey image back.
 
-### 3. Pemanasan hanya untuk probe, tidak pernah untuk warga
+### 3. Warm-up is for the probe only, never for citizens
 
-`frame(..., warmUp: true)` menunggu beberapa detik supaya aliran mengalir.
-Itu benar untuk probe yang berjalan di latar tiap sepuluh menit, dan salah
-untuk permintaan warga — yang akan menunggu enam detik untuk sebuah gambar
-pratinjau. Warga membaca cache; probe yang membayar pemanasannya.
+`frame(..., warmUp: true)` waits a few seconds for the stream to start flowing. That is right for the probe that runs in the background every ten minutes, and wrong for a citizen request, which would wait six seconds for a preview image. Citizens read the cache; the probe pays for the warm-up.
 
-### Jumlah penonton menghitung SAMBUNGAN, bukan orang
+### Viewer count counts CONNECTIONS, not people
 
-Diambil dari `consumers[]` di `/api/streams` go2rtc, disegarkan tiap sepuluh
-detik. Satu warga dengan dua tab terhitung dua, dan penonton dari panel
-Nawasara serta Gasta ikut masuk.
+It is taken from `consumers[]` in go2rtc's `/api/streams`, refreshed every ten seconds. One citizen with two tabs counts as two, and viewers from the Nawasara and Gasta panels are included.
 
-Untuk lencana "sedang ramai" itu memang angka yang ditanyakan. Yang **tidak**
-boleh dilakukan adalah memakainya sebagai statistik pemakaian aplikasi.
+For the "busy right now" badge that is exactly the number being asked for. What it must **not** be used for is app usage statistics.
 
-Di API, `viewers` bernilai `null` bila go2rtc tak terjangkau — dan `null`
-berbeda dari `0`. Peta penontonnya dipasang lewat properti statis pada
-Resource, bukan `additional()`: Laravel tidak meneruskan `additional()` dari
-koleksi ke anggotanya, sehingga `viewers` selalu null sementara
-`meta.viewers_total` menyebut angka yang benar. Properti itu **wajib
-dikosongkan di blok `finally`** — pada worker antrean yang hidup lama, peta
-yang tertinggal akan menisbatkan jumlah penonton satu permintaan ke
-permintaan berikutnya.
+In the API, `viewers` is `null` when go2rtc is unreachable, and `null` is different from `0`. The viewer map is set through a static property on the Resource, not through `additional()`: Laravel does not pass `additional()` from a collection down to its members, so `viewers` would always be null while `meta.viewers_total` reported the correct number. That property **must be cleared in a `finally` block**. On a long-lived queue worker, a leftover map would attribute one request's viewer counts to the next.
 
 ## Setup
 
-### 1. Sidecar go2rtc (docker-compose)
+### 1. go2rtc sidecar (docker-compose)
 
-Sudah ditambahkan di `docker-compose.dev.yml` sebagai service `go2rtc`
-(image `alexxit/go2rtc`), berada di network `nawasara-dev` yang sama
-dengan app. Container menjangkau kamera di LAN lewat routing Docker host —
-tidak perlu `network_mode` khusus selama host bisa me-route ke subnet
-kamera.
+Already added to `docker-compose.dev.yml` as the `go2rtc` service (image `alexxit/go2rtc`), on the same `nawasara-dev` network as the app. The container reaches cameras on the LAN through Docker host routing; no special `network_mode` is needed as long as the host can route to the camera subnet.
 
-Reverse-proxy `/go2rtc/` → `go2rtc:1984` sudah disiapkan di
-`docker/nginx.conf` (pakai `resolver` + variabel `proxy_pass` supaya nginx
-tidak gagal boot kalau sidecar belum up).
+The reverse proxy `/go2rtc/` to `go2rtc:1984` is already set up in `docker/nginx.conf` (using `resolver` plus a `proxy_pass` variable so nginx does not fail to boot if the sidecar is not up yet).
 
 ### 2. Environment
 
@@ -119,42 +76,37 @@ CCTV_GO2RTC_PUBLIC_URL=/go2rtc              # dipakai browser (via proxy)
 CCTV_GO2RTC_MODE=webrtc
 ```
 
-### 3. Migrasi + permission
+### 3. Migrations + permissions
 
 ```bash
 php artisan migrate
 php artisan db:seed --class="Nawasara\\Cctv\\Database\\Seeders\\PermissionSeeder"
 ```
 
-## Keamanan kredensial kamera
+## Camera credential security
 
-Username/password kamera disimpan **terenkripsi at-rest** (cast `encrypted`
-di model `Camera`), disembunyikan dari serialisasi (`$hidden`), dan tidak
-pernah ditulis ke log. URL RTSP lengkap (dengan kredensial) hanya dibangun
-sesaat untuk dikirim ke go2rtc, tidak pernah ditampilkan ke user.
+Camera usernames and passwords are stored **encrypted at rest** (the `encrypted` cast on the `Camera` model), hidden from serialisation (`$hidden`), and never written to logs. The full RTSP URL (with credentials) is built only briefly to send to go2rtc, and never shown to the user.
 
-> ⚠️ Saat menambah kamera, masukkan kredensial lewat form CRUD — **jangan**
-> hardcode di config/repo.
+> Note: when adding a camera, enter the credentials through the CRUD form. **Do not** hardcode them in config or the repo.
 
 ## Console commands
 
-| Command | Fungsi | Jadwal |
+| Command | Purpose | Schedule |
 |---|---|---|
-| `cctv:probe` | TCP-probe kamera aktif — bahan **diagnosis petugas** | tiap 5 menit |
-| `cctv:probe-streams` | Tarik satu bingkai lewat go2rtc — **inilah yang dilihat warga**, sekaligus mengisi cache pratinjau | tiap 10 menit |
-| `cctv:sync-go2rtc` | Daftarkan ulang semua kamera ke go2rtc (jaring pengaman bila sidecar restart) | tiap jam |
-| `cctv:sync-titles` | Ambil nama kamera dari ChannelTitle device Dahua (hanya yang `sync_title` aktif) | 03:00 WIB |
+| `cctv:probe` | TCP-probe active cameras, the raw material for **operator diagnosis** | every 5 minutes |
+| `cctv:probe-streams` | Pull one frame through go2rtc: **this is what citizens see**, and it also fills the preview cache | every 10 minutes |
+| `cctv:sync-go2rtc` | Re-register all cameras with go2rtc (a safety net if the sidecar restarts) | hourly |
+| `cctv:sync-titles` | Fetch camera names from the Dahua device ChannelTitle (only those with `sync_title` enabled) | 03:00 WIB |
 
-Selang `cctv:probe-streams` **terikat** ke umur cache pratinjau — lihat
-keputusan 2 di atas sebelum mengubahnya.
+The `cctv:probe-streams` interval is **tied** to the preview cache lifetime. See design note 2 above before changing it.
 
 ## Permissions
 
-| Permission | Untuk |
+| Permission | For |
 |---|---|
-| `cctv.camera.view` | Lihat live view + daftar kamera |
-| `cctv.camera.create` | Tambah kamera |
-| `cctv.camera.update` | Edit kamera |
-| `cctv.camera.delete` | Hapus kamera |
-| `cctv.recording.view` | Lihat + putar rekaman |
-| `cctv.recording.delete` | Hapus rekaman |
+| `cctv.camera.view` | View live view + camera list |
+| `cctv.camera.create` | Add a camera |
+| `cctv.camera.update` | Edit a camera |
+| `cctv.camera.delete` | Delete a camera |
+| `cctv.recording.view` | View + play recordings |
+| `cctv.recording.delete` | Delete recordings |
