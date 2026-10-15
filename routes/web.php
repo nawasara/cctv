@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Nawasara\Cctv\Http\Controllers\Go2rtcAuthController;
 use Nawasara\Cctv\Livewire\Camera\Index as CameraIndex;
 use Nawasara\Cctv\Livewire\Live\Index as LiveIndex;
 use Nawasara\Cctv\Livewire\Recording\Index as RecordingIndex;
@@ -19,3 +20,10 @@ Route::middleware(['web', 'auth'])->prefix('nawasara-cctv')->group(function () {
         ->middleware(PermissionMiddleware::using('cctv.recording.view'))
         ->name('nawasara-cctv.recording.index');
 });
+
+// Gerbang auth_request nginx untuk /go2rtc/api/ws; lihat Go2rtcAuthController.
+// Sengaja TANPA middleware `auth`: yang itu mengalihkan ke halaman login (302),
+// dan auth_request menganggap 3xx sebagai galat, bukan penolakan.
+Route::middleware(['web'])
+    ->get('nawasara-cctv/go2rtc-auth', Go2rtcAuthController::class)
+    ->name('nawasara-cctv.go2rtc-auth');
