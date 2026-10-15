@@ -5,9 +5,12 @@ namespace Nawasara\Cctv\Livewire\Camera;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Cctv\Models\Camera;
 use Nawasara\Cctv\Services\Go2rtcClient;
 
@@ -22,12 +25,16 @@ use Nawasara\Cctv\Services\Go2rtcClient;
 class Index extends Component
 {
     use WithPagination;
+    use WithSudo;
 
     #[Url(except: '')]
     public string $search = '';
 
     // -- Form modal state ------------------------------------------------------
     public bool $showForm = false;
+    // Audit keamanan 15 Oktober 2026: hanya diisi server (openEdit), dikunci
+    // supaya payload wire tidak dapat mengalihkan simpan ke kamera lain.
+    #[Locked]
     public ?int $editingId = null;
 
     public string $name = '';
@@ -195,6 +202,8 @@ class Index extends Component
         $this->dispatch('toast', type: 'success', message: 'Kamera tersimpan.');
     }
 
+    // Audit keamanan 15 Oktober 2026 (S6): wajib sudo (AGENTS.md §6).
+    #[RequiresSudo(reason: 'menghapus kamera CCTV')]
     public function delete(int $id, Go2rtcClient $go2rtc): void
     {
         Gate::authorize('cctv.camera.delete');

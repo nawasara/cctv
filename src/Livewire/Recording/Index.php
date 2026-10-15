@@ -4,9 +4,12 @@ namespace Nawasara\Cctv\Livewire\Recording;
 
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Nawasara\AuthPrimitives\Attributes\RequiresSudo;
+use Nawasara\AuthPrimitives\Traits\WithSudo;
 use Nawasara\Cctv\Models\Camera;
 use Nawasara\Cctv\Models\Recording;
 
@@ -22,6 +25,7 @@ use Nawasara\Cctv\Models\Recording;
 class Index extends Component
 {
     use WithPagination;
+    use WithSudo;
 
     #[Url(except: '')]
     public string $cameraFilter = '';
@@ -29,6 +33,8 @@ class Index extends Component
     #[Url(except: '')]
     public string $date = '';
 
+    // Audit keamanan 15 Oktober 2026: hanya diisi server lewat play().
+    #[Locked]
     public ?int $playingId = null;
 
     #[Computed]
@@ -61,9 +67,13 @@ class Index extends Component
 
     public function play(int $id): void
     {
+        Gate::authorize('cctv.recording.view');
+
         $this->playingId = $id;
     }
 
+    // Audit keamanan 15 Oktober 2026 (S6): wajib sudo (AGENTS.md §6).
+    #[RequiresSudo(reason: 'menghapus rekaman CCTV')]
     public function delete(int $id): void
     {
         Gate::authorize('cctv.recording.delete');
