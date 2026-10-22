@@ -105,7 +105,10 @@ class CameraController extends Controller
 
             ->firstOrFail();
 
-        $signed = $signer->sign(['slug' => $camera->slug]);
+        // `aud=web` ikut ditandatangani: URL ini hanya boleh diputar dari
+        // halaman yang Origin-nya terdaftar (Gasta). Lihat
+        // StreamProxyController::verify().
+        $signed = $signer->sign(['slug' => $camera->slug, 'aud' => StreamProxyController::AUD_WEB]);
         $exp = $signed['exp'];
 
         // Pakai subdomain stream khusus kalau di-set, fallback ke APP_URL.
@@ -114,7 +117,8 @@ class CameraController extends Controller
         $base = rtrim((string) config('nawasara-cctv.go2rtc.stream_url_base') ?: url(''), '/');
 
         $streamUrl = $base."/api/v1/cctv/stream/{$camera->slug}"
-            .'?sig='.$signed['sig']
+            .'?aud='.StreamProxyController::AUD_WEB
+            .'&sig='.$signed['sig']
             .'&exp='.$exp;
 
         return response()->json([

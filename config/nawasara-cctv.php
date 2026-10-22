@@ -53,6 +53,14 @@ return [
         'stream_url_base' => env('CCTV_STREAM_URL_BASE'),
     ],
 
+    // Halaman yang boleh memutar URL stream ber-aud=web (diterbitkan lewat
+    // token nws_ untuk Gasta). Hanya Gasta: keputusan 22 Oktober 2026, tidak
+    // boleh ada platform pemantauan CCTV lain. Pisahkan dengan koma.
+    'stream_web_origins' => array_values(array_filter(array_map('trim', explode(',', (string) env(
+        'CCTV_STREAM_WEB_ORIGINS',
+        'https://gasta.ponorogo.go.id,https://gasta-dev.ponorogo.go.id',
+    ))))),
+
     // -------------------------------------------------------------------------
     // Dahua RTSP defaults
     // -------------------------------------------------------------------------
